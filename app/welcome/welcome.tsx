@@ -1,89 +1,591 @@
-import logoDark from "./logo-dark.svg";
-import logoLight from "./logo-light.svg";
+import { useEffect, useState } from "react";
+import { WORKOUT_PLAN } from "~/workout";
 
-export function Welcome() {
-  return (
-    <main className="flex items-center justify-center pt-16 pb-4">
-      <div className="flex-1 flex flex-col items-center gap-16 min-h-0">
-        <header className="flex flex-col items-center gap-9">
-          <div className="w-[500px] max-w-[100vw] p-4">
-            <img
-              src={logoLight}
-              alt="React Router"
-              className="block w-full dark:hidden"
-            />
-            <img
-              src={logoDark}
-              alt="React Router"
-              className="hidden w-full dark:block"
-            />
+type Screen = "home" | "workout" | "complete" | "history";
+
+const REST_DURATION = 60;
+
+export default function Welcome() {
+  const [screen, setScreen] = useState<Screen>("home");
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [currentCircuit, setCurrentCircuit] = useState(1);
+  const [isFinisher, setIsFinisher] = useState(false);
+  const [isResting, setIsResting] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermission>("default");
+
+  const today = new Date();
+  const todayKey = `workout_done_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const todayName = dayNames[today.getDay()];
+
+  const todayWorkout = WORKOUT_PLAN.weekly_plan.find(
+    (w) => w.day === todayName,
+  );
+  const isRestDay = todayName === "Thursday";
+
+  useEffect(() => {
+    const completed = localStorage.getItem(todayKey) === "true";
+    setIsCompleted(completed);
+
+    const reminder = localStorage.getItem("reminder_enabled") === "true";
+    setReminderEnabled(reminder);
+
+    if ("Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, [todayKey]);
+
+  useEffect(() => {
+    let interval: number;
+    if (timerRunning && timerSeconds > 0) {
+      interval = window.setInterval(() => {
+        setTimerSeconds((prev) => {
+          if (prev <= 1) {
+            setTimerRunning(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timerRunning, timerSeconds]);
+
+  const startWorkout = () => {
+    setScreen("workout");
+    setCurrentExerciseIndex(0);
+    setCurrentCircuit(1);
+    setIsFinisher(false);
+    setIsResting(false);
+    setTimerSeconds(0);
+    setTimerRunning(false);
+  };
+
+  useEffect(() => {
+    if (isResting) {
+      setTimerSeconds(REST_DURATION);
+      setTimerRunning(true);
+    }
+  }, [isResting]);
+
+  useEffect(() => {
+    if (isResting && timerSeconds === 0 && !timerRunning) {
+      setIsResting(false);
+      setCurrentExerciseIndex(0);
+    }
+  }, [isResting, timerSeconds, timerRunning]);
+
+  const getCurrentExercise = () => {
+    if (!todayWorkout) return null;
+    if (isFinisher) return todayWorkout.finisher;
+    return todayWorkout.exercises[currentExerciseIndex];
+  };
+
+  const handleNext = () => {
+    if (!todayWorkout) return;
+
+    if (isFinisher) {
+      setScreen("complete");
+      return;
+    }
+
+    if (currentExerciseIndex < todayWorkout.exercises.length - 1) {
+      setCurrentExerciseIndex((prev: number) => prev + 1);
+      setTimerSeconds(0);
+      setTimerRunning(false);
+    } else {
+      if (currentCircuit < todayWorkout.circuit_repetitions) {
+        setCurrentCircuit((prev: number) => prev + 1);
+        setIsResting(true);
+      } else {
+        setIsFinisher(true);
+        setTimerSeconds(0);
+        setTimerRunning(false);
+      }
+    }
+  };
+
+  const skipRest = () => {
+    setTimerRunning(false);
+    setTimerSeconds(0);
+    setIsResting(false);
+    setCurrentExerciseIndex(0);
+  };
+
+  const startTimer = (timeStr: string) => {
+    const seconds = parseInt(timeStr.replace(/[^0-9]/g, ""));
+    setTimerSeconds(seconds);
+    setTimerRunning(true);
+  };
+
+  const validateWorkout = () => {
+    localStorage.setItem(todayKey, "true");
+    setIsCompleted(true);
+    setScreen("home");
+  };
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days = [];
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i));
+    }
+    return days;
+  };
+
+  const getWorkoutStatus = (date: Date) => {
+    const dateKey = `workout_done_${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const isDone = localStorage.getItem(dateKey) === "true";
+
+    const dayName = dayNames[date.getDay()];
+    const isRestDay = dayName === "Thursday";
+    const isPast =
+      date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const isToday = date.toDateString() === today.toDateString();
+
+    if (isDone) return "done";
+    if (isRestDay) return "rest";
+    if (isPast && !isToday) return "missed";
+    return "future";
+  };
+
+  const previousMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1),
+    );
+  };
+
+  const nextMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1),
+    );
+  };
+
+  const requestNotificationPermission = async () => {
+    if ("Notification" in window && Notification.permission === "default") {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === "granted") {
+        setReminderEnabled(true);
+        localStorage.setItem("reminder_enabled", "true");
+      }
+    } else if (Notification.permission === "granted") {
+      const newState = !reminderEnabled;
+      setReminderEnabled(newState);
+      localStorage.setItem("reminder_enabled", String(newState));
+    }
+  };
+
+  useEffect(() => {
+    if (reminderEnabled && notificationPermission === "granted") {
+      const checkReminder = () => {
+        const now = new Date();
+        if (now.getHours() === 18 && now.getMinutes() === 0) {
+          const completed = localStorage.getItem(todayKey) === "true";
+          if (!completed) {
+            new Notification("Entraînement quotidien", {
+              body: "Il est temps de faire votre séance de 15 minutes !",
+              icon: "💪",
+            });
+          }
+        }
+      };
+
+      const interval = setInterval(checkReminder, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [reminderEnabled, notificationPermission, todayKey]);
+
+  if (screen === "history") {
+    const days = getDaysInMonth(currentMonth);
+    const monthName = currentMonth.toLocaleDateString("fr-FR", {
+      month: "long",
+      year: "numeric",
+    });
+
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
+        <div className="max-w-md mx-auto pt-8">
+          <div className="flex items-center justify-between mb-8">
+            <button
+              onClick={previousMonth}
+              className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+            >
+              ←
+            </button>
+            <h1 className="text-xl text-slate-800 capitalize">{monthName}</h1>
+            <button
+              onClick={nextMonth}
+              className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+            >
+              →
+            </button>
           </div>
-        </header>
-        <div className="max-w-[300px] w-full space-y-6 px-4">
-          <nav className="rounded-3xl border border-gray-200 p-6 dark:border-gray-700 space-y-4">
-            <p className="leading-6 text-gray-700 dark:text-gray-200 text-center">
-              What&apos;s next?
-            </p>
-            <ul>
-              {resources.map(({ href, text, icon }) => (
-                <li key={href}>
-                  <a
-                    className="group flex items-center gap-3 self-stretch p-3 leading-normal text-blue-700 hover:underline dark:text-blue-500"
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {icon}
-                    {text}
-                  </a>
-                </li>
+
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="grid grid-cols-7 gap-2 mb-4">
+              {["D", "L", "M", "M", "J", "V", "S"].map((day, idx) => (
+                <div
+                  key={idx}
+                  className="text-center text-xs text-slate-500 py-2"
+                >
+                  {day}
+                </div>
               ))}
-            </ul>
-          </nav>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2">
+              {days.map((day, idx) => {
+                if (!day) {
+                  return <div key={idx} className="aspect-square" />;
+                }
+
+                const status = getWorkoutStatus(day);
+                const isCurrentDay =
+                  day.toDateString() === today.toDateString();
+
+                let bgColor = "bg-slate-50";
+                let textColor = "text-slate-400";
+                let borderColor = "";
+
+                if (status === "done") {
+                  bgColor = "bg-green-100";
+                  textColor = "text-green-700";
+                } else if (status === "missed") {
+                  bgColor = "bg-red-100";
+                  textColor = "text-red-700";
+                } else if (status === "rest") {
+                  bgColor = "bg-blue-50";
+                  textColor = "text-blue-600";
+                }
+
+                if (isCurrentDay) {
+                  borderColor = "ring-2 ring-slate-800";
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    className={`aspect-square flex items-center justify-center rounded-lg ${bgColor} ${textColor} ${borderColor} text-sm`}
+                  >
+                    {day.getDate()}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-4 mt-6 pt-4 border-t border-slate-100 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-green-100"></div>
+                <span className="text-slate-600">Fait</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-red-100"></div>
+                <span className="text-slate-600">Oublié</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-blue-50"></div>
+                <span className="text-slate-600">Repos</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3">
+          <div className="max-w-md mx-auto flex gap-2">
+            <button
+              onClick={() => setScreen("home")}
+              className="flex-1 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Aujourd'hui
+            </button>
+            <button className="flex-1 py-3 rounded-xl bg-slate-800 text-white">
+              Historique
+            </button>
+          </div>
         </div>
       </div>
-    </main>
-  );
-}
+    );
+  }
 
-const resources = [
-  {
-    href: "https://reactrouter.com/docs",
-    text: "React Router Docs",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="20"
-        viewBox="0 0 20 20"
-        fill="none"
-        className="stroke-gray-600 group-hover:stroke-current dark:stroke-gray-300"
-      >
-        <path
-          d="M9.99981 10.0751V9.99992M17.4688 17.4688C15.889 19.0485 11.2645 16.9853 7.13958 12.8604C3.01467 8.73546 0.951405 4.11091 2.53116 2.53116C4.11091 0.951405 8.73546 3.01467 12.8604 7.13958C16.9853 11.2645 19.0485 15.889 17.4688 17.4688ZM2.53132 17.4688C0.951566 15.8891 3.01483 11.2645 7.13974 7.13963C11.2647 3.01471 15.8892 0.951453 17.469 2.53121C19.0487 4.11096 16.9854 8.73551 12.8605 12.8604C8.73562 16.9853 4.11107 19.0486 2.53132 17.4688Z"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: "https://rmx.as/discord",
-    text: "Join Discord",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="20"
-        viewBox="0 0 24 20"
-        fill="none"
-        className="stroke-gray-600 group-hover:stroke-current dark:stroke-gray-300"
-      >
-        <path
-          d="M15.0686 1.25995L14.5477 1.17423L14.2913 1.63578C14.1754 1.84439 14.0545 2.08275 13.9422 2.31963C12.6461 2.16488 11.3406 2.16505 10.0445 2.32014C9.92822 2.08178 9.80478 1.84975 9.67412 1.62413L9.41449 1.17584L8.90333 1.25995C7.33547 1.51794 5.80717 1.99419 4.37748 2.66939L4.19 2.75793L4.07461 2.93019C1.23864 7.16437 0.46302 11.3053 0.838165 15.3924L0.868838 15.7266L1.13844 15.9264C2.81818 17.1714 4.68053 18.1233 6.68582 18.719L7.18892 18.8684L7.50166 18.4469C7.96179 17.8268 8.36504 17.1824 8.709 16.4944L8.71099 16.4904C10.8645 17.0471 13.128 17.0485 15.2821 16.4947C15.6261 17.1826 16.0293 17.8269 16.4892 18.4469L16.805 18.8725L17.3116 18.717C19.3056 18.105 21.1876 17.1751 22.8559 15.9238L23.1224 15.724L23.1528 15.3923C23.5873 10.6524 22.3579 6.53306 19.8947 2.90714L19.7759 2.73227L19.5833 2.64518C18.1437 1.99439 16.6386 1.51826 15.0686 1.25995ZM16.6074 10.7755L16.6074 10.7756C16.5934 11.6409 16.0212 12.1444 15.4783 12.1444C14.9297 12.1444 14.3493 11.6173 14.3493 10.7877C14.3493 9.94885 14.9378 9.41192 15.4783 9.41192C16.0471 9.41192 16.6209 9.93851 16.6074 10.7755ZM8.49373 12.1444C7.94513 12.1444 7.36471 11.6173 7.36471 10.7877C7.36471 9.94885 7.95323 9.41192 8.49373 9.41192C9.06038 9.41192 9.63892 9.93712 9.6417 10.7815C9.62517 11.6239 9.05462 12.1444 8.49373 12.1444Z"
-          strokeWidth="1.5"
-        />
-      </svg>
-    ),
-  },
-];
+  if (screen === "home") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
+        <div className="max-w-md mx-auto pt-8">
+          <h1 className="text-3xl mb-2 text-slate-800">Routine 15min</h1>
+          <p className="text-slate-500 mb-8">
+            {today.toLocaleDateString("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
+          </p>
+
+          {isRestDay ? (
+            <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
+              <div className="text-6xl mb-4">🧘</div>
+              <h2 className="text-2xl mb-2 text-slate-800">Jour de repos</h2>
+              <p className="text-slate-500">
+                Profitez de votre journée de récupération
+              </p>
+            </div>
+          ) : todayWorkout ? (
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl mb-1 text-slate-800">
+                      {todayWorkout.session}
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      {todayWorkout.circuit_repetitions} circuits
+                    </p>
+                  </div>
+                  {isCompleted && (
+                    <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+                      ✓ Fait
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 mb-6">
+                  {todayWorkout.exercises.map((ex, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0"
+                    >
+                      <span className="text-slate-700">{ex.name}</span>
+                      <span className="text-slate-500 text-sm">
+                        {ex.reps || ex.time || ex.instruction}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center py-2 bg-slate-50 rounded-lg px-3 mt-3">
+                    <span className="text-slate-700">
+                      Finisher: {todayWorkout.finisher.name}
+                    </span>
+                    <span className="text-slate-500 text-sm">
+                      {todayWorkout.finisher.instruction}
+                    </span>
+                  </div>
+                </div>
+
+                {isCompleted ? (
+                  <div className="text-center py-4 text-green-700">
+                    <div className="text-5xl mb-2">🎉</div>
+                    <p className="text-lg">Séance terminée aujourd'hui</p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={startWorkout}
+                    className="w-full bg-slate-800 text-white py-4 rounded-xl text-lg hover:bg-slate-700 transition-colors"
+                  >
+                    Commencer la séance
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <h3 className="text-sm mb-3 text-slate-600">
+                  Rappel quotidien
+                </h3>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm text-slate-700 mb-1">
+                      Notification à 18h00
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Fonctionne uniquement si l'app est ouverte
+                    </p>
+                  </div>
+                  <button
+                    onClick={requestNotificationPermission}
+                    className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                      reminderEnabled
+                        ? "bg-slate-800 text-white"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    {reminderEnabled ? "Activé" : "Activer"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
+              <p className="text-slate-500">Aucune séance prévue aujourd'hui</p>
+            </div>
+          )}
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3">
+          <div className="max-w-md mx-auto flex gap-2">
+            <button className="flex-1 py-3 rounded-xl bg-slate-800 text-white">
+              Aujourd'hui
+            </button>
+            <button
+              onClick={() => setScreen("history")}
+              className="flex-1 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Historique
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "workout" && todayWorkout) {
+    if (isResting) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-blue-900 to-blue-950 p-4 flex flex-col">
+          <div className="max-w-md mx-auto w-full flex-1 flex flex-col pt-8">
+            <div className="text-center mb-8">
+              <p className="text-blue-300 text-sm mb-2">Repos entre circuits</p>
+              <p className="text-blue-400 text-xs">
+                Circuit {currentCircuit}/{todayWorkout.circuit_repetitions}
+              </p>
+            </div>
+
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 mb-8 text-center">
+                <h2 className="text-2xl text-white mb-8">Repos</h2>
+                <div className="text-8xl text-white mb-8">{timerSeconds}s</div>
+                <p className="text-blue-200 text-sm">
+                  Le prochain circuit commence automatiquement
+                </p>
+              </div>
+
+              <button
+                onClick={skipRest}
+                className="w-full bg-white/20 text-white py-5 rounded-2xl text-xl hover:bg-white/30 transition-colors"
+              >
+                Passer le repos
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const currentExercise = getCurrentExercise();
+    if (!currentExercise) return null;
+
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-800 to-slate-900 p-4 flex flex-col">
+        <div className="max-w-md mx-auto w-full flex-1 flex flex-col pt-8">
+          <div className="text-center mb-8">
+            <p className="text-slate-400 text-sm mb-2">
+              {isFinisher
+                ? "Finisher"
+                : `Circuit ${currentCircuit}/${todayWorkout.circuit_repetitions}`}
+            </p>
+            {!isFinisher && (
+              <p className="text-slate-500 text-xs">
+                Exercice {currentExerciseIndex + 1}/
+                {todayWorkout.exercises.length}
+              </p>
+            )}
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center">
+            <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 mb-8">
+              <h2 className="text-3xl text-white mb-6 text-center">
+                {currentExercise.name}
+              </h2>
+
+              <div className="text-center">
+                {"reps" in currentExercise && currentExercise.reps && (
+                  <div className="text-6xl text-white mb-2">
+                    {currentExercise.reps}
+                  </div>
+                )}
+
+                {"instruction" in currentExercise &&
+                  currentExercise.instruction && (
+                    <div className="text-2xl text-slate-300 mb-4">
+                      {currentExercise.instruction}
+                    </div>
+                  )}
+
+                {"time" in currentExercise && currentExercise.time && (
+                  <div className="space-y-4">
+                    {timerSeconds > 0 ? (
+                      <div className="text-7xl text-white mb-4">
+                        {timerSeconds}s
+                      </div>
+                    ) : (
+                      <div className="text-4xl text-slate-300 mb-4">
+                        {currentExercise.time}
+                      </div>
+                    )}
+
+                    {!timerRunning && timerSeconds === 0 && (
+                      <button
+                        onClick={() => startTimer(currentExercise.time)}
+                        className="bg-white/20 text-white px-8 py-3 rounded-xl hover:bg-white/30 transition-colors"
+                      >
+                        Démarrer le timer
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={handleNext}
+              className="w-full bg-white text-slate-900 py-5 rounded-2xl text-xl hover:bg-slate-100 transition-colors"
+            >
+              Suivant
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "complete") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-green-100 p-4 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center">
+          <div className="text-8xl mb-6">🎯</div>
+          <h2 className="text-3xl mb-4 text-slate-800">Bravo !</h2>
+          <p className="text-slate-600 mb-8">Vous avez terminé votre séance</p>
+
+          <button
+            onClick={validateWorkout}
+            className="bg-green-600 text-white px-8 py-4 rounded-2xl text-xl hover:bg-green-700 transition-colors"
+          >
+            Valider la séance
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
