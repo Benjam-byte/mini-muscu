@@ -25,13 +25,17 @@ export const links: Route.LinksFunction = () => [
   {
     rel: "icon",
     type: "image/png",
-    href: "/favicon-96x96.png",
+    href: "/mini-muscu/favicon-96x96.png",
     sizes: "96x96",
   },
-  { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
-  { rel: "shortcut icon", href: "/favicon.ico" },
-  { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
-  { rel: "manifest", href: "/site.webmanifest" },
+  { rel: "icon", type: "image/svg+xml", href: "/mini-muscu/favicon.svg" },
+  { rel: "shortcut icon", href: "/mini-muscu/favicon.ico" },
+  {
+    rel: "apple-touch-icon",
+    sizes: "180x180",
+    href: "/mini-muscu/apple-touch-icon.png",
+  },
+  { rel: "manifest", href: "/mini-muscu/site.webmanifest" },
 ];
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

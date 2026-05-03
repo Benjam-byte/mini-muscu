@@ -1,6 +1,8 @@
 {
   "name": "MiniMuscu",
   "short_name": "MMuscu",
+  "start_url": "/mini-muscu/",
+  "scope": "/mini-muscu/",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
