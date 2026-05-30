@@ -2,10 +2,9 @@ import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
-export default defineConfig({
+const appBaseName = "/mini-muscu";
+
+export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), reactRouter()],
-  base: "/mini-muscu/",
-  resolve: {
-    tsconfigPaths: true,
-  },
-});
+  base: mode === "development" ? appBaseName : `${appBaseName}/`,
+}));

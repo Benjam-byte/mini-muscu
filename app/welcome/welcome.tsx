@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { WORKOUT_PLAN } from "~/workout";
+import { WORKOUT_PLAN } from "../workout";
+import { StreakCard } from "./streakCard";
+import { MonthStatsCard, type MonthStats } from "./monthStratsCard";
 
 type Screen = "home" | "workout" | "complete" | "history";
 
 const REST_DURATION = 60;
+const WORKOUT_DAY_START_HOUR = 6;
 
 export default function Welcome() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -19,8 +22,64 @@ export default function Welcome() {
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission>("default");
 
+  function getWorkoutDayDate(date = new Date()) {
+    const workoutDayDate = new Date(date);
+
+    if (workoutDayDate.getHours() < WORKOUT_DAY_START_HOUR) {
+      workoutDayDate.setDate(workoutDayDate.getDate() - 1);
+    }
+
+    return workoutDayDate;
+  }
+
+  function formatWorkoutDateKey(date: Date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function getWorkoutDoneKey(date: Date) {
+    return `workout_done_${formatWorkoutDateKey(date)}`;
+  }
+
+  function hasWorkoutPlanned(date: Date) {
+    const dayName = dayNames[date.getDay()];
+
+    return WORKOUT_PLAN.weekly_plan.some((workout) => workout.day === dayName);
+  }
+
+  function getCurrentStreak(workoutDayDate: Date) {
+    let streak = 0;
+    const dateToCheck = new Date(workoutDayDate);
+
+    const isTodayCompleted =
+      localStorage.getItem(getWorkoutDoneKey(dateToCheck)) === "true";
+
+    if (!isTodayCompleted) {
+      dateToCheck.setDate(dateToCheck.getDate() - 1);
+    }
+
+    while (true) {
+      if (!hasWorkoutPlanned(dateToCheck)) {
+        dateToCheck.setDate(dateToCheck.getDate() - 1);
+        continue;
+      }
+
+      const isWorkoutDone =
+        localStorage.getItem(getWorkoutDoneKey(dateToCheck)) === "true";
+
+      if (!isWorkoutDone) {
+        break;
+      }
+
+      streak += 1;
+      dateToCheck.setDate(dateToCheck.getDate() - 1);
+    }
+
+    return streak;
+  }
+
   const today = new Date();
-  const todayKey = `workout_done_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const workoutDayDate = getWorkoutDayDate(today);
+  const todayKey = `workout_done_${formatWorkoutDateKey(workoutDayDate)}`;
   const dayNames = [
     "Sunday",
     "Monday",
@@ -30,12 +89,115 @@ export default function Welcome() {
     "Friday",
     "Saturday",
   ];
-  const todayName = dayNames[today.getDay()];
+  const todayName = dayNames[workoutDayDate.getDay()];
 
   const todayWorkout = WORKOUT_PLAN.weekly_plan.find(
     (w) => w.day === todayName,
   );
   const isRestDay = todayName === "Thursday";
+
+  const currentStreak = getCurrentStreak(workoutDayDate);
+
+  const frenchDayNames = [
+    "Dimanche",
+    "Lundi",
+    "Mardi",
+    "Mercredi",
+    "Jeudi",
+    "Vendredi",
+    "Samedi",
+  ];
+
+  const getMonthProgress = (monthDate: Date) => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+
+    const currentWorkoutDay = new Date(
+      workoutDayDate.getFullYear(),
+      workoutDayDate.getMonth(),
+      workoutDayDate.getDate(),
+    );
+
+    let completedWorkoutCount = 0;
+    let plannedWorkoutCount = 0;
+    const missedCountByDayName: Record<string, number> = {};
+
+    for (
+      let date = new Date(year, month, 1);
+      date <= lastDayOfMonth;
+      date.setDate(date.getDate() + 1)
+    ) {
+      const calendarDay = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+      );
+
+      const isFutureWorkoutDay = calendarDay > currentWorkoutDay;
+
+      if (isFutureWorkoutDay) {
+        continue;
+      }
+
+      if (!hasWorkoutPlanned(calendarDay)) {
+        continue;
+      }
+
+      const isWorkoutDone =
+        localStorage.getItem(getWorkoutDoneKey(calendarDay)) === "true";
+
+      const isCurrentWorkoutDay =
+        calendarDay.getTime() === currentWorkoutDay.getTime();
+
+      if (isCurrentWorkoutDay && !isWorkoutDone) {
+        continue;
+      }
+
+      plannedWorkoutCount += 1;
+
+      if (isWorkoutDone) {
+        completedWorkoutCount += 1;
+        continue;
+      }
+
+      const frenchDayName = frenchDayNames[calendarDay.getDay()];
+      missedCountByDayName[frenchDayName] =
+        (missedCountByDayName[frenchDayName] ?? 0) + 1;
+    }
+
+    const successPercentage =
+      plannedWorkoutCount === 0
+        ? 0
+        : Math.round((completedWorkoutCount / plannedWorkoutCount) * 100);
+
+    const worstMissedDayEntry = Object.entries(missedCountByDayName).sort(
+      ([, firstCount], [, secondCount]) => secondCount - firstCount,
+    )[0];
+
+    return {
+      successPercentage,
+      completedWorkoutCount,
+      plannedWorkoutCount,
+      worstMissedDayName: worstMissedDayEntry?.[0] ?? null,
+      worstMissedDayCount: worstMissedDayEntry?.[1] ?? 0,
+    };
+  };
+
+  const getMonthStats = (monthDate: Date): MonthStats => {
+    const currentMonthProgress = getMonthProgress(monthDate);
+    const previousMonthProgress = getMonthProgress(
+      new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1),
+    );
+
+    return {
+      ...currentMonthProgress,
+      previousSuccessPercentage: previousMonthProgress.successPercentage,
+      growthPercentagePoint:
+        currentMonthProgress.successPercentage -
+        previousMonthProgress.successPercentage,
+    };
+  };
 
   useEffect(() => {
     const completed = localStorage.getItem(todayKey) === "true";
@@ -144,7 +306,7 @@ export default function Welcome() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
+    const startingDayOfWeek = (firstDay.getDay() + 6) % 7;
 
     const days = [];
     for (let i = 0; i < startingDayOfWeek; i++) {
@@ -157,14 +319,25 @@ export default function Welcome() {
   };
 
   const getWorkoutStatus = (date: Date) => {
-    const dateKey = `workout_done_${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const dateKey = `workout_done_${formatWorkoutDateKey(date)}`;
     const isDone = localStorage.getItem(dateKey) === "true";
 
     const dayName = dayNames[date.getDay()];
     const isRestDay = dayName === "Thursday";
-    const isPast =
-      date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const isToday = date.toDateString() === today.toDateString();
+    const currentWorkoutDay = new Date(
+      workoutDayDate.getFullYear(),
+      workoutDayDate.getMonth(),
+      workoutDayDate.getDate(),
+    );
+
+    const calendarDay = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    );
+
+    const isPast = calendarDay < currentWorkoutDay;
+    const isToday = calendarDay.getTime() === currentWorkoutDay.getTime();
 
     if (isDone) return "done";
     if (isRestDay) return "rest";
@@ -182,21 +355,6 @@ export default function Welcome() {
     setCurrentMonth(
       new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1),
     );
-  };
-
-  const requestNotificationPermission = async () => {
-    if ("Notification" in window && Notification.permission === "default") {
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-      if (permission === "granted") {
-        setReminderEnabled(true);
-        localStorage.setItem("reminder_enabled", "true");
-      }
-    } else if (Notification.permission === "granted") {
-      const newState = !reminderEnabled;
-      setReminderEnabled(newState);
-      localStorage.setItem("reminder_enabled", String(newState));
-    }
   };
 
   useEffect(() => {
@@ -221,6 +379,7 @@ export default function Welcome() {
 
   if (screen === "history") {
     const days = getDaysInMonth(currentMonth);
+    const monthStats = getMonthStats(currentMonth);
     const monthName = currentMonth.toLocaleDateString("fr-FR", {
       month: "long",
       year: "numeric",
@@ -247,7 +406,7 @@ export default function Welcome() {
 
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="grid grid-cols-7 gap-2 mb-4">
-              {["D", "L", "M", "M", "J", "V", "S"].map((day, idx) => (
+              {["L", "M", "M", "J", "V", "S", "D"].map((day, idx) => (
                 <div
                   key={idx}
                   className="text-center text-xs text-slate-500 py-2"
@@ -265,7 +424,7 @@ export default function Welcome() {
 
                 const status = getWorkoutStatus(day);
                 const isCurrentDay =
-                  day.toDateString() === today.toDateString();
+                  day.toDateString() === workoutDayDate.toDateString();
 
                 let bgColor = "bg-slate-50";
                 let textColor = "text-slate-400";
@@ -312,6 +471,10 @@ export default function Welcome() {
               </div>
             </div>
           </div>
+
+          <div className="mt-6">
+            <MonthStatsCard monthStats={monthStats} />
+          </div>
         </div>
 
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3">
@@ -343,6 +506,9 @@ export default function Welcome() {
               month: "long",
             })}
           </p>
+          <div className="mb-6">
+            <StreakCard streak={currentStreak} />
+          </div>
 
           {isRestDay ? (
             <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
@@ -406,32 +572,6 @@ export default function Welcome() {
                     Commencer la séance
                   </button>
                 )}
-              </div>
-
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h3 className="text-sm mb-3 text-slate-600">
-                  Rappel quotidien
-                </h3>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm text-slate-700 mb-1">
-                      Notification à 18h00
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Fonctionne uniquement si l'app est ouverte
-                    </p>
-                  </div>
-                  <button
-                    onClick={requestNotificationPermission}
-                    className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                      reminderEnabled
-                        ? "bg-slate-800 text-white"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
-                  >
-                    {reminderEnabled ? "Activé" : "Activer"}
-                  </button>
-                </div>
               </div>
             </div>
           ) : (
