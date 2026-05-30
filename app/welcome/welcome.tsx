@@ -2,11 +2,17 @@ import { useEffect, useState } from "react";
 import { WORKOUT_PLAN } from "../workout";
 import { StreakCard } from "./streakCard";
 import { MonthStatsCard, type MonthStats } from "./monthStratsCard";
+import {
+  WORKOUT_PLAN_BY_KEY,
+  WorkoutPlanPicker,
+  type WorkoutPlanKey,
+} from "./workoutPlanPicker";
 
 type Screen = "home" | "workout" | "complete" | "history";
 
 const REST_DURATION = 60;
 const WORKOUT_DAY_START_HOUR = 6;
+const SELECTED_WORKOUT_PLAN_KEY = "selected_workout_plan";
 
 export default function Welcome() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -31,6 +37,26 @@ export default function Welcome() {
 
     return workoutDayDate;
   }
+
+  function getSavedWorkoutPlanKey(): WorkoutPlanKey {
+    const savedWorkoutPlanKey = localStorage.getItem(SELECTED_WORKOUT_PLAN_KEY);
+
+    if (
+      savedWorkoutPlanKey === "debutant" ||
+      savedWorkoutPlanKey === "entraine" ||
+      savedWorkoutPlanKey === "bien_entraine" ||
+      savedWorkoutPlanKey === "sportif_haut_niveau"
+    ) {
+      return savedWorkoutPlanKey;
+    }
+
+    return "debutant";
+  }
+
+  const [selectedWorkoutPlanKey, setSelectedWorkoutPlanKey] =
+    useState<WorkoutPlanKey>(getSavedWorkoutPlanKey);
+
+  const selectedWorkoutPlan = WORKOUT_PLAN_BY_KEY[selectedWorkoutPlanKey];
 
   function formatWorkoutDateKey(date: Date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -77,6 +103,18 @@ export default function Welcome() {
     return streak;
   }
 
+  const handleWorkoutPlanChange = (workoutPlanKey: WorkoutPlanKey) => {
+    setSelectedWorkoutPlanKey(workoutPlanKey);
+    localStorage.setItem(SELECTED_WORKOUT_PLAN_KEY, workoutPlanKey);
+
+    setCurrentExerciseIndex(0);
+    setCurrentCircuit(1);
+    setIsFinisher(false);
+    setIsResting(false);
+    setTimerSeconds(0);
+    setTimerRunning(false);
+  };
+
   const today = new Date();
   const workoutDayDate = getWorkoutDayDate(today);
   const todayKey = `workout_done_${formatWorkoutDateKey(workoutDayDate)}`;
@@ -91,8 +129,8 @@ export default function Welcome() {
   ];
   const todayName = dayNames[workoutDayDate.getDay()];
 
-  const todayWorkout = WORKOUT_PLAN.weekly_plan.find(
-    (w) => w.day === todayName,
+  const todayWorkout = selectedWorkoutPlan.weekly_plan.find(
+    (workout) => workout.day === todayName,
   );
   const isRestDay = todayName === "Thursday";
 
@@ -506,6 +544,12 @@ export default function Welcome() {
               month: "long",
             })}
           </p>
+          <div className="mb-6">
+            <WorkoutPlanPicker
+              selectedWorkoutPlanKey={selectedWorkoutPlanKey}
+              onWorkoutPlanChange={handleWorkoutPlanChange}
+            />
+          </div>
           <div className="mb-6">
             <StreakCard streak={currentStreak} />
           </div>
