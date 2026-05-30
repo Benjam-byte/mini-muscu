@@ -7,6 +7,8 @@ import {
   WorkoutPlanPicker,
   type WorkoutPlanKey,
 } from "./workoutPlanPicker";
+import { ExercisePreviewButton, EyeIcon } from "./eyeIcon";
+import { ExerciseIllustrationModal } from "./exerciceModal";
 
 type Screen = "home" | "workout" | "complete" | "history";
 
@@ -27,6 +29,17 @@ export default function Welcome() {
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission>("default");
+  const [selectedExerciseName, setSelectedExerciseName] = useState<
+    string | null
+  >(null);
+
+  const openExerciseIllustration = (exerciseName: string) => {
+    setSelectedExerciseName(exerciseName);
+  };
+
+  const closeExerciseIllustration = () => {
+    setSelectedExerciseName(null);
+  };
 
   function getWorkoutDayDate(date = new Date()) {
     const workoutDayDate = new Date(date);
@@ -534,22 +547,16 @@ export default function Welcome() {
 
   if (screen === "home") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
-        <div className="max-w-md mx-auto pt-8">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100  pb-24">
+        <div className="max-w-md mx-auto pt-2">
           <h1 className="text-3xl mb-2 text-slate-800">Routine 15min</h1>
-          <p className="text-slate-500 mb-8">
+          <p className="text-slate-500 mb-2">
             {today.toLocaleDateString("fr-FR", {
               weekday: "long",
               day: "numeric",
               month: "long",
             })}
           </p>
-          <div className="mb-6">
-            <WorkoutPlanPicker
-              selectedWorkoutPlanKey={selectedWorkoutPlanKey}
-              onWorkoutPlanChange={handleWorkoutPlanChange}
-            />
-          </div>
           <div className="mb-6">
             <StreakCard streak={currentStreak} />
           </div>
@@ -587,16 +594,24 @@ export default function Welcome() {
                       key={idx}
                       className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0"
                     >
-                      <span className="text-slate-700">{ex.name}</span>
+                      <div className="flex items-center gap-2">
+                        <ExercisePreviewButton
+                          exerciseName={ex.name}
+                          onClick={openExerciseIllustration}
+                        />
+                        <span className="text-slate-700">{ex.name}</span>
+                      </div>
                       <span className="text-slate-500 text-sm">
                         {ex.reps || ex.time || ex.instruction}
                       </span>
                     </div>
                   ))}
                   <div className="flex justify-between items-center py-2 bg-slate-50 rounded-lg px-3 mt-3">
-                    <span className="text-slate-700">
-                      Finisher: {todayWorkout.finisher.name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-700">
+                        Finisher: {todayWorkout.finisher.name}
+                      </span>
+                    </div>
                     <span className="text-slate-500 text-sm">
                       {todayWorkout.finisher.instruction}
                     </span>
@@ -623,6 +638,12 @@ export default function Welcome() {
               <p className="text-slate-500">Aucune séance prévue aujourd'hui</p>
             </div>
           )}
+          <div className="mt-6">
+            <WorkoutPlanPicker
+              selectedWorkoutPlanKey={selectedWorkoutPlanKey}
+              onWorkoutPlanChange={handleWorkoutPlanChange}
+            />
+          </div>
         </div>
 
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3">
@@ -638,6 +659,10 @@ export default function Welcome() {
             </button>
           </div>
         </div>
+        <ExerciseIllustrationModal
+          exerciseName={selectedExerciseName}
+          onClose={closeExerciseIllustration}
+        />
       </div>
     );
   }
@@ -697,9 +722,20 @@ export default function Welcome() {
 
           <div className="flex-1 flex flex-col justify-center">
             <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 mb-8">
-              <h2 className="text-3xl text-white mb-6 text-center">
-                {currentExercise.name}
-              </h2>
+              <div className="mb-6 flex items-center justify-center gap-3">
+                <h2 className="text-3xl text-white text-center">
+                  {currentExercise.name}
+                </h2>
+
+                <button
+                  type="button"
+                  onClick={() => openExerciseIllustration(currentExercise.name)}
+                  aria-label={`Voir l'exercice ${currentExercise.name}`}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                >
+                  <EyeIcon />
+                </button>
+              </div>
 
               <div className="text-center">
                 {"reps" in currentExercise && currentExercise.reps && (

@@ -1,3 +1,42 @@
+export const EXERCISE_IMAGE_BY_NAME: Record<string, string> = {
+  Pompes: "/exercises/pompes.png",
+  "Pompes lentes": "/exercises/pompes.png",
+  "Pompes + squats": "/exercises/pompes.png",
+
+  Squats: "/exercises/squats.png",
+  "Squat hold": "/exercises/squats.png",
+  "Squat lent": "/exercises/squats.png",
+
+  Gainage: "/exercises/gainage.png",
+  "Planche avant": "/exercises/gainage.png",
+
+  "Planche latérale": "/exercises/gainage-latérale.png",
+  "Planche latérale gauche": "/exercises/gainage-latérale.png",
+  "Planche latérale droite": "/exercises/gainage-latérale.png",
+
+  "Planche shoulder taps": "/exercises/planche-shoulder-taps.png",
+
+  "Mountain climbers": "/exercises/moutain-climbers.png",
+  "Mountain climbers lents": "/exercises/moutain-climbers.png",
+
+  Fentes: "/exercises/fentes.png",
+  "Fentes bulgares": "/exercises/fente-bulagres.png",
+
+  "Glute bridge": "/exercises/glute-bridge.png",
+
+  "Pompes serrées": "/exercises/pompes-serrées.png",
+
+  "Dips (lit/chaise)": "/exercises/dips.png",
+
+  Superman: "/exercises/superman.png",
+
+  "Wall sit": "/exercises/wall-sit.png",
+
+  "Squat une jambe assisté": "/exercises/squat-jambe-assisté.png",
+
+  Burpees: "/exercises/burpies.png",
+};
+
 export const WORKOUT_PLAN = {
   weekly_plan: [
     {
@@ -21,8 +60,8 @@ export const WORKOUT_PLAN = {
       circuit_repetitions: 2,
       exercises: [
         { name: "Fentes", reps: "10/jambe" },
-        { name: "Glute bridge", reps: "15-20" },
-        { name: "Squats", reps: "10-15" },
+        { name: "Glute bridge", reps: "15" },
+        { name: "Squats", reps: "10" },
         { name: "Wall sit", time: "45s" },
       ],
       finisher: {
@@ -81,8 +120,8 @@ export const WORKOUT_PLAN = {
       session: "S5 - Unilatéral",
       circuit_repetitions: 2,
       exercises: [
-        { name: "Squat une jambe assisté", reps: "6-10/jambe" },
-        { name: "Fentes bulgares", reps: "8-12/jambe" },
+        { name: "Squat une jambe assisté", reps: "6/jambe" },
+        { name: "Fentes bulgares", reps: "8/jambe" },
         { name: "Pompes", reps: "8" },
         { name: "Planche latérale", time: "30s/côté" },
       ],
