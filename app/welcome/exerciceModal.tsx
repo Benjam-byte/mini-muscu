@@ -31,7 +31,7 @@ export function ExerciseIllustrationModal({
             type="button"
             onClick={onClose}
             aria-label="Fermer"
-            className="flex h-6 w-6 -pt-2 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+            className="flex h-9 w-9 -pt-2 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
           >
             ×
           </button>

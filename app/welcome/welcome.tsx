@@ -547,7 +547,7 @@ export default function Welcome() {
 
   if (screen === "home") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100  pb-24">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
         <div className="max-w-md mx-auto pt-2">
           <h1 className="text-3xl mb-2 text-slate-800">Routine 15min</h1>
           <p className="text-slate-500 mb-2">
