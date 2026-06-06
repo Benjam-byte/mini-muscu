@@ -87,7 +87,7 @@ export const WORKOUT_PLAN = {
     {
       day: "Friday",
       session: "S4 - Core & gainage",
-      circuit_repetitions: 3,
+      circuit_repetitions: 2,
       exercises: [
         {
           name: "Planche avant",

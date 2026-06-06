@@ -19,7 +19,7 @@ export function ExerciseIllustrationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4">
       <div className="w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-100 p-4">
           <div>

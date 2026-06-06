@@ -289,13 +289,6 @@ export default function Welcome() {
   };
 
   useEffect(() => {
-    if (isResting) {
-      setTimerSeconds(REST_DURATION);
-      setTimerRunning(true);
-    }
-  }, [isResting]);
-
-  useEffect(() => {
     if (isResting && timerSeconds === 0 && !timerRunning) {
       setIsResting(false);
       setCurrentExerciseIndex(0);
@@ -323,6 +316,8 @@ export default function Welcome() {
     } else {
       if (currentCircuit < todayWorkout.circuit_repetitions) {
         setCurrentCircuit((prev: number) => prev + 1);
+        setTimerSeconds(REST_DURATION);
+        setTimerRunning(true);
         setIsResting(true);
       } else {
         setIsFinisher(true);
@@ -704,87 +699,95 @@ export default function Welcome() {
     if (!currentExercise) return null;
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-800 to-slate-900 p-4 flex flex-col">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col pt-8">
-          <div className="text-center mb-8">
-            <p className="text-slate-400 text-sm mb-2">
-              {isFinisher
-                ? "Finisher"
-                : `Circuit ${currentCircuit}/${todayWorkout.circuit_repetitions}`}
-            </p>
-            {!isFinisher && (
-              <p className="text-slate-500 text-xs">
-                Exercice {currentExerciseIndex + 1}/
-                {todayWorkout.exercises.length}
+      <>
+        <div className="min-h-screen bg-gradient-to-b from-slate-800 to-slate-900 p-4 flex flex-col">
+          <div className="max-w-md mx-auto w-full flex-1 flex flex-col pt-8">
+            <div className="text-center mb-8">
+              <p className="text-slate-400 text-sm mb-2">
+                {isFinisher
+                  ? "Finisher"
+                  : `Circuit ${currentCircuit}/${todayWorkout.circuit_repetitions}`}
               </p>
-            )}
-          </div>
+              {!isFinisher && (
+                <p className="text-slate-500 text-xs">
+                  Exercice {currentExerciseIndex + 1}/
+                  {todayWorkout.exercises.length}
+                </p>
+              )}
+            </div>
 
-          <div className="flex-1 flex flex-col justify-center">
-            <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 mb-8">
-              <div className="mb-6 flex items-center justify-center gap-3">
-                <h2 className="text-3xl text-white text-center">
-                  {currentExercise.name}
-                </h2>
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 mb-8">
+                <div className="mb-6 flex items-center justify-center gap-3">
+                  <h2 className="text-3xl text-white text-center">
+                    {currentExercise.name}
+                  </h2>
 
-                <button
-                  type="button"
-                  onClick={() => openExerciseIllustration(currentExercise.name)}
-                  aria-label={`Voir l'exercice ${currentExercise.name}`}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-                >
-                  <EyeIcon />
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openExerciseIllustration(currentExercise.name)
+                    }
+                    aria-label={`Voir l'exercice ${currentExercise.name}`}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                  >
+                    <EyeIcon />
+                  </button>
+                </div>
 
-              <div className="text-center">
-                {"reps" in currentExercise && currentExercise.reps && (
-                  <div className="text-6xl text-white mb-2">
-                    {currentExercise.reps}
-                  </div>
-                )}
-
-                {"instruction" in currentExercise &&
-                  currentExercise.instruction && (
-                    <div className="text-2xl text-slate-300 mb-4">
-                      {currentExercise.instruction}
+                <div className="text-center">
+                  {"reps" in currentExercise && currentExercise.reps && (
+                    <div className="text-6xl text-white mb-2">
+                      {currentExercise.reps}
                     </div>
                   )}
 
-                {"time" in currentExercise && currentExercise.time && (
-                  <div className="space-y-4">
-                    {timerSeconds > 0 ? (
-                      <div className="text-7xl text-white mb-4">
-                        {timerSeconds}s
-                      </div>
-                    ) : (
-                      <div className="text-4xl text-slate-300 mb-4">
-                        {currentExercise.time}
+                  {"instruction" in currentExercise &&
+                    currentExercise.instruction && (
+                      <div className="text-2xl text-slate-300 mb-4">
+                        {currentExercise.instruction}
                       </div>
                     )}
 
-                    {!timerRunning && timerSeconds === 0 && (
-                      <button
-                        onClick={() => startTimer(currentExercise.time)}
-                        className="bg-white/20 text-white px-8 py-3 rounded-xl hover:bg-white/30 transition-colors"
-                      >
-                        Démarrer le timer
-                      </button>
-                    )}
-                  </div>
-                )}
+                  {"time" in currentExercise && currentExercise.time && (
+                    <div className="space-y-4">
+                      {timerSeconds > 0 ? (
+                        <div className="text-7xl text-white mb-4">
+                          {timerSeconds}s
+                        </div>
+                      ) : (
+                        <div className="text-4xl text-slate-300 mb-4">
+                          {currentExercise.time}
+                        </div>
+                      )}
+
+                      {!timerRunning && timerSeconds === 0 && (
+                        <button
+                          onClick={() => startTimer(currentExercise.time)}
+                          className="bg-white/20 text-white px-8 py-3 rounded-xl hover:bg-white/30 transition-colors"
+                        >
+                          Démarrer le timer
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <button
-              onClick={handleNext}
-              className="w-full bg-white text-slate-900 py-5 rounded-2xl text-xl hover:bg-slate-100 transition-colors"
-            >
-              Suivant
-            </button>
+              <button
+                onClick={handleNext}
+                className="w-full bg-white text-slate-900 py-5 rounded-2xl text-xl hover:bg-slate-100 transition-colors"
+              >
+                Suivant
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+        <ExerciseIllustrationModal
+          exerciseName={selectedExerciseName}
+          onClose={closeExerciseIllustration}
+        />
+      </>
     );
   }
 
