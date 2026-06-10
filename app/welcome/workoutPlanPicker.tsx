@@ -1,62 +1,51 @@
 import {
-  WORKOUT_PLAN,
-  WORKOUT_PLAN_ENTRAINE,
-  WORKOUT_PLAN_BIEN_ENTRAINE,
-  WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU,
-} from "../workout";
-
-export const WORKOUT_PLAN_BY_KEY = {
-  debutant: WORKOUT_PLAN,
-  entraine: WORKOUT_PLAN_ENTRAINE,
-  bien_entraine: WORKOUT_PLAN_BIEN_ENTRAINE,
-  sportif_haut_niveau: WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU,
-};
-
-export type WorkoutPlanKey = keyof typeof WORKOUT_PLAN_BY_KEY;
+  WORKOUT_LEVEL_EMOJI_BY_LEVEL,
+  type WorkoutLevel,
+} from "../workoutHistory";
 
 const WORKOUT_PLAN_OPTION_LIST: {
-  key: WorkoutPlanKey;
+  key: WorkoutLevel;
   title: string;
   description: string;
   emoji: string;
 }[] = [
   {
-    key: "debutant",
+    key: "base",
     title: "Débutant",
     description: "Routine simple pour construire l’habitude.",
-    emoji: "🌱",
+    emoji: WORKOUT_LEVEL_EMOJI_BY_LEVEL.base,
   },
   {
     key: "entraine",
     title: "Entraîné",
     description: "Plus de volume, mais encore raisonnable.",
-    emoji: "💪",
+    emoji: WORKOUT_LEVEL_EMOJI_BY_LEVEL.entraine,
   },
   {
     key: "bien_entraine",
     title: "Bien entraîné",
     description: "Séances plus solides et plus intenses.",
-    emoji: "🔥",
+    emoji: WORKOUT_LEVEL_EMOJI_BY_LEVEL.bien_entraine,
   },
   {
     key: "sportif_haut_niveau",
     title: "Sportif haut niveau",
     description: "Version dure, à choisir si tu récupères bien.",
-    emoji: "⚡",
+    emoji: WORKOUT_LEVEL_EMOJI_BY_LEVEL.sportif_haut_niveau,
   },
 ];
 
 type WorkoutPlanPickerProps = {
-  selectedWorkoutPlanKey: WorkoutPlanKey;
-  onWorkoutPlanChange: (workoutPlanKey: WorkoutPlanKey) => void;
+  selectedWorkoutLevel: WorkoutLevel;
+  onWorkoutLevelChange: (workoutLevel: WorkoutLevel) => void;
 };
 
 export function WorkoutPlanPicker({
-  selectedWorkoutPlanKey,
-  onWorkoutPlanChange,
+  selectedWorkoutLevel,
+  onWorkoutLevelChange,
 }: WorkoutPlanPickerProps) {
   const selectedWorkoutPlanOption = WORKOUT_PLAN_OPTION_LIST.find(
-    (workoutPlanOption) => workoutPlanOption.key === selectedWorkoutPlanKey,
+    (workoutPlanOption) => workoutPlanOption.key === selectedWorkoutLevel,
   )!;
 
   return (
@@ -71,13 +60,13 @@ export function WorkoutPlanPicker({
 
         <div className="flex gap-2">
           {WORKOUT_PLAN_OPTION_LIST.map((workoutPlanOption) => {
-            const isSelected = workoutPlanOption.key === selectedWorkoutPlanKey;
+            const isSelected = workoutPlanOption.key === selectedWorkoutLevel;
 
             return (
               <button
                 key={workoutPlanOption.key}
                 type="button"
-                onClick={() => onWorkoutPlanChange(workoutPlanOption.key)}
+                onClick={() => onWorkoutLevelChange(workoutPlanOption.key)}
                 aria-label={workoutPlanOption.title}
                 title={workoutPlanOption.title}
                 className={

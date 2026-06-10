@@ -1,20 +1,54 @@
 import { useEffect, useState } from "react";
-import { WORKOUT_PLAN } from "../workout";
+import {
+  WORKOUT_PLAN,
+  WORKOUT_PLAN_BIEN_ENTRAINE,
+  WORKOUT_PLAN_ENTRAINE,
+  WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU,
+} from "../workout";
+import {
+  CURRENT_WORKOUT_LEVEL_KEY,
+  DIFFICULTY_EMOJI_BY_RATING,
+  LEVEL_UP_SUGGESTION_DISMISSED_AT_KEY,
+  WORKOUT_LEVEL_EMOJI_BY_LEVEL,
+  WORKOUT_LEVEL_LIST,
+  getCurrentWorkoutLevel,
+  getWorkoutHistoryItem,
+  isWorkoutCompleted,
+  shouldSuggestLevelUp,
+  type DifficultyRating,
+  type WorkoutHistoryItem,
+  type WorkoutLevel,
+} from "../workoutHistory";
 import { StreakCard } from "./streakCard";
 import { MonthStatsCard, type MonthStats } from "./monthStratsCard";
-import {
-  WORKOUT_PLAN_BY_KEY,
-  WorkoutPlanPicker,
-  type WorkoutPlanKey,
-} from "./workoutPlanPicker";
+import { WorkoutPlanPicker } from "./workoutPlanPicker";
 import { ExercisePreviewButton, EyeIcon } from "./eyeIcon";
 import { ExerciseIllustrationModal } from "./exerciceModal";
 
 type Screen = "home" | "workout" | "complete" | "history";
 
-const REST_DURATION = 60;
+const REST_DURATION = 30;
 const WORKOUT_DAY_START_HOUR = 6;
 const SELECTED_WORKOUT_PLAN_KEY = "selected_workout_plan";
+const LEVEL_UP_SUGGESTION_DISMISSAL_DURATION = 7 * 24 * 60 * 60 * 1000;
+
+const WORKOUT_PLAN_BY_LEVEL: Record<WorkoutLevel, typeof WORKOUT_PLAN> = {
+  base: WORKOUT_PLAN,
+  entraine: WORKOUT_PLAN_ENTRAINE,
+  bien_entraine: WORKOUT_PLAN_BIEN_ENTRAINE,
+  sportif_haut_niveau: WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU,
+};
+
+const DIFFICULTY_OPTION_LIST: {
+  rating: DifficultyRating;
+  label: string;
+}[] = [
+  { rating: 1, label: "Très facile" },
+  { rating: 2, label: "Facile" },
+  { rating: 3, label: "Bien dosée" },
+  { rating: 4, label: "Difficile" },
+  { rating: 5, label: "Trop difficile" },
+];
 
 export default function Welcome() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -26,6 +60,10 @@ export default function Welcome() {
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [selectedDifficultyRating, setSelectedDifficultyRating] =
+    useState<DifficultyRating | null>(null);
+  const [shouldShowLevelUpSuggestion, setShouldShowLevelUpSuggestion] =
+    useState(false);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission>("default");
@@ -51,25 +89,32 @@ export default function Welcome() {
     return workoutDayDate;
   }
 
-  function getSavedWorkoutPlanKey(): WorkoutPlanKey {
-    const savedWorkoutPlanKey = localStorage.getItem(SELECTED_WORKOUT_PLAN_KEY);
+  function getSavedWorkoutLevel(): WorkoutLevel {
+    const currentWorkoutLevel = getCurrentWorkoutLevel();
+    const legacyWorkoutPlanKey = localStorage.getItem(
+      SELECTED_WORKOUT_PLAN_KEY,
+    );
 
     if (
-      savedWorkoutPlanKey === "debutant" ||
-      savedWorkoutPlanKey === "entraine" ||
-      savedWorkoutPlanKey === "bien_entraine" ||
-      savedWorkoutPlanKey === "sportif_haut_niveau"
+      !localStorage.getItem(CURRENT_WORKOUT_LEVEL_KEY) &&
+      (legacyWorkoutPlanKey === "debutant" ||
+        legacyWorkoutPlanKey === "entraine" ||
+        legacyWorkoutPlanKey === "bien_entraine" ||
+        legacyWorkoutPlanKey === "sportif_haut_niveau")
     ) {
-      return savedWorkoutPlanKey;
+      const migratedWorkoutLevel =
+        legacyWorkoutPlanKey === "debutant" ? "base" : legacyWorkoutPlanKey;
+      localStorage.setItem(CURRENT_WORKOUT_LEVEL_KEY, migratedWorkoutLevel);
+      return migratedWorkoutLevel;
     }
 
-    return "debutant";
+    return currentWorkoutLevel;
   }
 
-  const [selectedWorkoutPlanKey, setSelectedWorkoutPlanKey] =
-    useState<WorkoutPlanKey>(getSavedWorkoutPlanKey);
+  const [currentWorkoutLevel, setCurrentWorkoutLevel] =
+    useState<WorkoutLevel>(getSavedWorkoutLevel);
 
-  const selectedWorkoutPlan = WORKOUT_PLAN_BY_KEY[selectedWorkoutPlanKey];
+  const selectedWorkoutPlan = WORKOUT_PLAN_BY_LEVEL[currentWorkoutLevel];
 
   function formatWorkoutDateKey(date: Date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -82,15 +127,16 @@ export default function Welcome() {
   function hasWorkoutPlanned(date: Date) {
     const dayName = dayNames[date.getDay()];
 
-    return WORKOUT_PLAN.weekly_plan.some((workout) => workout.day === dayName);
+    return selectedWorkoutPlan.weekly_plan.some(
+      (workout) => workout.day === dayName,
+    );
   }
 
   function getCurrentStreak(workoutDayDate: Date) {
     let streak = 0;
     const dateToCheck = new Date(workoutDayDate);
 
-    const isTodayCompleted =
-      localStorage.getItem(getWorkoutDoneKey(dateToCheck)) === "true";
+    const isTodayCompleted = isWorkoutCompleted(getWorkoutDoneKey(dateToCheck));
 
     if (!isTodayCompleted) {
       dateToCheck.setDate(dateToCheck.getDate() - 1);
@@ -102,8 +148,7 @@ export default function Welcome() {
         continue;
       }
 
-      const isWorkoutDone =
-        localStorage.getItem(getWorkoutDoneKey(dateToCheck)) === "true";
+      const isWorkoutDone = isWorkoutCompleted(getWorkoutDoneKey(dateToCheck));
 
       if (!isWorkoutDone) {
         break;
@@ -116,9 +161,10 @@ export default function Welcome() {
     return streak;
   }
 
-  const handleWorkoutPlanChange = (workoutPlanKey: WorkoutPlanKey) => {
-    setSelectedWorkoutPlanKey(workoutPlanKey);
-    localStorage.setItem(SELECTED_WORKOUT_PLAN_KEY, workoutPlanKey);
+  const handleWorkoutLevelChange = (workoutLevel: WorkoutLevel) => {
+    setCurrentWorkoutLevel(workoutLevel);
+    localStorage.setItem(CURRENT_WORKOUT_LEVEL_KEY, workoutLevel);
+    setShouldShowLevelUpSuggestion(false);
 
     setCurrentExerciseIndex(0);
     setCurrentCircuit(1);
@@ -195,8 +241,7 @@ export default function Welcome() {
         continue;
       }
 
-      const isWorkoutDone =
-        localStorage.getItem(getWorkoutDoneKey(calendarDay)) === "true";
+      const isWorkoutDone = isWorkoutCompleted(getWorkoutDoneKey(calendarDay));
 
       const isCurrentWorkoutDay =
         calendarDay.getTime() === currentWorkoutDay.getTime();
@@ -251,7 +296,7 @@ export default function Welcome() {
   };
 
   useEffect(() => {
-    const completed = localStorage.getItem(todayKey) === "true";
+    const completed = isWorkoutCompleted(todayKey);
     setIsCompleted(completed);
 
     const reminder = localStorage.getItem("reminder_enabled") === "true";
@@ -261,6 +306,25 @@ export default function Welcome() {
       setNotificationPermission(Notification.permission);
     }
   }, [todayKey]);
+
+  useEffect(() => {
+    const dismissedAt = localStorage.getItem(
+      LEVEL_UP_SUGGESTION_DISMISSED_AT_KEY,
+    );
+    const dismissedAtTime = dismissedAt ? new Date(dismissedAt).getTime() : 0;
+    const isSuggestionDismissed =
+      Number.isFinite(dismissedAtTime) &&
+      Date.now() - dismissedAtTime < LEVEL_UP_SUGGESTION_DISMISSAL_DURATION;
+    const savedWorkoutLevel = getCurrentWorkoutLevel();
+    const isHighestWorkoutLevel =
+      savedWorkoutLevel === "sportif_haut_niveau";
+
+    setShouldShowLevelUpSuggestion(
+      !isHighestWorkoutLevel &&
+        !isSuggestionDismissed &&
+        shouldSuggestLevelUp(savedWorkoutLevel),
+    );
+  }, []);
 
   useEffect(() => {
     let interval: number;
@@ -341,9 +405,45 @@ export default function Welcome() {
   };
 
   const validateWorkout = () => {
-    localStorage.setItem(todayKey, "true");
+    if (!selectedDifficultyRating || !todayWorkout) {
+      return;
+    }
+
+    const workoutHistoryItem: WorkoutHistoryItem = {
+      dateKey: todayKey,
+      isCompleted: true,
+      workoutLevel: currentWorkoutLevel,
+      difficultyRating: selectedDifficultyRating,
+      session: todayWorkout.session,
+      completedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(todayKey, JSON.stringify(workoutHistoryItem));
     setIsCompleted(true);
     setScreen("home");
+    setSelectedDifficultyRating(null);
+  };
+
+  const increaseWorkoutLevel = (): void => {
+    const currentWorkoutLevelIndex =
+      WORKOUT_LEVEL_LIST.indexOf(currentWorkoutLevel);
+    const nextWorkoutLevel = WORKOUT_LEVEL_LIST[currentWorkoutLevelIndex + 1];
+
+    if (!nextWorkoutLevel) {
+      return;
+    }
+
+    localStorage.setItem(CURRENT_WORKOUT_LEVEL_KEY, nextWorkoutLevel);
+    setCurrentWorkoutLevel(nextWorkoutLevel);
+    setShouldShowLevelUpSuggestion(false);
+  };
+
+  const dismissLevelUpSuggestion = (): void => {
+    localStorage.setItem(
+      LEVEL_UP_SUGGESTION_DISMISSED_AT_KEY,
+      new Date().toISOString(),
+    );
+    setShouldShowLevelUpSuggestion(false);
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -366,7 +466,7 @@ export default function Welcome() {
 
   const getWorkoutStatus = (date: Date) => {
     const dateKey = `workout_done_${formatWorkoutDateKey(date)}`;
-    const isDone = localStorage.getItem(dateKey) === "true";
+    const isDone = isWorkoutCompleted(dateKey);
 
     const dayName = dayNames[date.getDay()];
     const isRestDay = dayName === "Thursday";
@@ -408,7 +508,7 @@ export default function Welcome() {
       const checkReminder = () => {
         const now = new Date();
         if (now.getHours() === 18 && now.getMinutes() === 0) {
-          const completed = localStorage.getItem(todayKey) === "true";
+          const completed = isWorkoutCompleted(todayKey);
           if (!completed) {
             new Notification("Entraînement quotidien", {
               body: "Il est temps de faire votre séance de 15 minutes !",
@@ -469,6 +569,9 @@ export default function Welcome() {
                 }
 
                 const status = getWorkoutStatus(day);
+                const workoutHistoryItem = getWorkoutHistoryItem(
+                  getWorkoutDoneKey(day),
+                );
                 const isCurrentDay =
                   day.toDateString() === workoutDayDate.toDateString();
 
@@ -494,9 +597,23 @@ export default function Welcome() {
                 return (
                   <div
                     key={idx}
-                    className={`aspect-square flex items-center justify-center rounded-lg ${bgColor} ${textColor} ${borderColor} text-sm`}
+                    className={`aspect-square flex flex-col items-center justify-center rounded-lg ${bgColor} ${textColor} ${borderColor} text-sm`}
                   >
-                    {day.getDate()}
+                    <span>{day.getDate()}</span>
+                    {workoutHistoryItem && (
+                      <span className="text-[10px] leading-tight">
+                        {
+                          WORKOUT_LEVEL_EMOJI_BY_LEVEL[
+                            workoutHistoryItem.workoutLevel
+                          ]
+                        }{" "}
+                        {
+                          DIFFICULTY_EMOJI_BY_RATING[
+                            workoutHistoryItem.difficultyRating
+                          ]
+                        }
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -515,6 +632,17 @@ export default function Welcome() {
                 <div className="w-4 h-4 rounded bg-blue-50"></div>
                 <span className="text-slate-600">Repos</span>
               </div>
+            </div>
+
+            <div className="mt-4 space-y-1 border-t border-slate-100 pt-4 text-[11px] leading-relaxed text-slate-500">
+              <p>
+                🌱 Base · 💪 Entraîné · 🔥 Bien entraîné · ⚡ Sportif haut
+                niveau
+              </p>
+              <p>
+                😄 très facile · 🙂 facile · 😐 bien · 😤 difficile · 🥵 trop
+                difficile
+              </p>
             </div>
           </div>
 
@@ -555,6 +683,35 @@ export default function Welcome() {
           <div className="mb-6">
             <StreakCard streak={currentStreak} />
           </div>
+
+          {shouldShowLevelUpSuggestion &&
+            currentWorkoutLevel !== "sportif_haut_niveau" && (
+            <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-5 shadow-sm">
+              <h2 className="mb-2 text-lg text-green-900">
+                Progression disponible
+              </h2>
+              <p className="mb-4 text-sm text-green-800">
+                Tes 3 dernières séances ont été faciles. Tu peux essayer le
+                niveau supérieur.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={increaseWorkoutLevel}
+                  className="flex-1 rounded-xl bg-green-700 px-4 py-3 text-sm text-white transition-colors hover:bg-green-800"
+                >
+                  Monter de niveau
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissLevelUpSuggestion}
+                  className="rounded-xl bg-white px-4 py-3 text-sm text-green-800 transition-colors hover:bg-green-100"
+                >
+                  Plus tard
+                </button>
+              </div>
+            </div>
+          )}
 
           {isRestDay ? (
             <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
@@ -635,8 +792,8 @@ export default function Welcome() {
           )}
           <div className="mt-6">
             <WorkoutPlanPicker
-              selectedWorkoutPlanKey={selectedWorkoutPlanKey}
-              onWorkoutPlanChange={handleWorkoutPlanChange}
+              selectedWorkoutLevel={currentWorkoutLevel}
+              onWorkoutLevelChange={handleWorkoutLevelChange}
             />
           </div>
         </div>
@@ -799,9 +956,41 @@ export default function Welcome() {
           <h2 className="text-3xl mb-4 text-slate-800">Bravo !</h2>
           <p className="text-slate-600 mb-8">Vous avez terminé votre séance</p>
 
+          <div className="mb-8 rounded-2xl bg-white p-5 text-left shadow-sm">
+            <h3 className="mb-4 text-center text-lg text-slate-800">
+              Comment était la séance ?
+            </h3>
+            <div className="space-y-2">
+              {DIFFICULTY_OPTION_LIST.map((difficultyOption) => {
+                const isSelected =
+                  selectedDifficultyRating === difficultyOption.rating;
+
+                return (
+                  <button
+                    key={difficultyOption.rating}
+                    type="button"
+                    onClick={() =>
+                      setSelectedDifficultyRating(difficultyOption.rating)
+                    }
+                    className={
+                      isSelected
+                        ? "w-full rounded-xl bg-green-100 px-4 py-3 text-left text-green-900 ring-2 ring-green-600"
+                        : "w-full rounded-xl bg-slate-50 px-4 py-3 text-left text-slate-700 transition-colors hover:bg-slate-100"
+                    }
+                  >
+                    {difficultyOption.rating}.{" "}
+                    {DIFFICULTY_EMOJI_BY_RATING[difficultyOption.rating]}{" "}
+                    {difficultyOption.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <button
             onClick={validateWorkout}
-            className="bg-green-600 text-white px-8 py-4 rounded-2xl text-xl hover:bg-green-700 transition-colors"
+            disabled={selectedDifficultyRating === null}
+            className="bg-green-600 text-white px-8 py-4 rounded-2xl text-xl hover:bg-green-700 transition-colors disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             Valider la séance
           </button>
