@@ -60,16 +60,6 @@ type MonthStatsCardProps = {
 };
 
 export function MonthStatsCard({ monthStats }: MonthStatsCardProps) {
-  const growthLabel =
-    monthStats.growthPercentagePoint > 0
-      ? `+${monthStats.growthPercentagePoint} pts`
-      : `${monthStats.growthPercentagePoint} pts`;
-
-  const growthColor =
-    monthStats.growthPercentagePoint >= 0
-      ? "text-green-700 bg-green-50"
-      : "text-red-700 bg-red-50";
-
   const currentProgressWidth = `${monthStats.successPercentage}%`;
   const previousProgressWidth = `${monthStats.previousSuccessPercentage}%`;
 
@@ -82,9 +72,6 @@ export function MonthStatsCard({ monthStats }: MonthStatsCardProps) {
             <h2 className="text-2xl">Régularité</h2>
           </div>
 
-          <div className={`rounded-full px-3 py-1 text-sm ${growthColor}`}>
-            {growthLabel}
-          </div>
         </div>
       </div>
 
