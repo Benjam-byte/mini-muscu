@@ -6,6 +6,20 @@ export type WorkoutLevel =
 
 export type DifficultyRating = 1 | 2 | 3 | 4 | 5;
 
+export type FinisherResult =
+  | {
+      exerciseName: string;
+      type: "repetitions";
+      unit: "repetitions" | "tours";
+      value: number;
+    }
+  | {
+      exerciseName: string;
+      type: "duration";
+      unit: "seconds";
+      value: number;
+    };
+
 export type WorkoutHistoryItem = {
   dateKey: string;
   isCompleted: true;
@@ -13,6 +27,7 @@ export type WorkoutHistoryItem = {
   difficultyRating: DifficultyRating;
   session: string;
   completedAt: string;
+  finisherResult?: FinisherResult;
 };
 
 export const CURRENT_WORKOUT_LEVEL_KEY = "current_workout_level";
@@ -107,6 +122,22 @@ export const getCompletedWorkoutHistoryItemList =
       firstItem.dateKey.localeCompare(secondItem.dateKey),
     );
   };
+
+export const getLatestFinisherResult = (
+  exerciseName: string,
+  performanceType: FinisherResult["type"],
+): FinisherResult | null => {
+  const latestWorkoutHistoryItem = getCompletedWorkoutHistoryItemList()
+    .slice()
+    .reverse()
+    .find(
+      (workoutHistoryItem) =>
+        workoutHistoryItem.finisherResult?.exerciseName === exerciseName &&
+        workoutHistoryItem.finisherResult.type === performanceType,
+    );
+
+  return latestWorkoutHistoryItem?.finisherResult ?? null;
+};
 
 export const shouldSuggestLevelUp = (
   currentWorkoutLevel: WorkoutLevel,

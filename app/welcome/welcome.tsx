@@ -12,10 +12,12 @@ import {
   WORKOUT_LEVEL_EMOJI_BY_LEVEL,
   WORKOUT_LEVEL_LIST,
   getCurrentWorkoutLevel,
+  getLatestFinisherResult,
   getWorkoutHistoryItem,
   isWorkoutCompleted,
   shouldSuggestLevelUp,
   type DifficultyRating,
+  type FinisherResult,
   type WorkoutHistoryItem,
   type WorkoutLevel,
 } from "../workoutHistory";
@@ -50,6 +52,30 @@ const DIFFICULTY_OPTION_LIST: {
   { rating: 5, label: "Trop difficile" },
 ];
 
+const formatDuration = (totalSeconds: number): string => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
+const formatFinisherResult = (finisherResult: FinisherResult): string => {
+  if (finisherResult.type === "duration") {
+    return formatDuration(finisherResult.value);
+  }
+
+  const unitLabel =
+    finisherResult.unit === "tours"
+      ? finisherResult.value === 1
+        ? "tour"
+        : "tours"
+      : finisherResult.value === 1
+        ? "répétition"
+        : "répétitions";
+
+  return `${finisherResult.value} ${unitLabel}`;
+};
+
 export default function Welcome() {
   const [screen, setScreen] = useState<Screen>("home");
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -59,6 +85,11 @@ export default function Welcome() {
   const [isResting, setIsResting] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [finisherRepetitionInput, setFinisherRepetitionInput] = useState("");
+  const [finisherElapsedSeconds, setFinisherElapsedSeconds] = useState(0);
+  const [finisherTimerStartedAt, setFinisherTimerStartedAt] = useState<
+    number | null
+  >(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const [selectedDifficultyRating, setSelectedDifficultyRating] =
     useState<DifficultyRating | null>(null);
@@ -77,6 +108,12 @@ export default function Welcome() {
 
   const closeExerciseIllustration = () => {
     setSelectedExerciseName(null);
+  };
+
+  const resetFinisherPerformance = () => {
+    setFinisherRepetitionInput("");
+    setFinisherElapsedSeconds(0);
+    setFinisherTimerStartedAt(null);
   };
 
   function getWorkoutDayDate(date = new Date()) {
@@ -172,6 +209,7 @@ export default function Welcome() {
     setIsResting(false);
     setTimerSeconds(0);
     setTimerRunning(false);
+    resetFinisherPerformance();
   };
 
   const today = new Date();
@@ -192,6 +230,44 @@ export default function Welcome() {
     (workout) => workout.day === todayName,
   );
   const isRestDay = todayName === "Thursday";
+
+  const getCurrentFinisherResult = (): FinisherResult | null => {
+    if (!todayWorkout) {
+      return null;
+    }
+
+    const { name, performance } = todayWorkout.finisher;
+
+    if (performance.type === "duration") {
+      if (finisherTimerStartedAt !== null || finisherElapsedSeconds < 1) {
+        return null;
+      }
+
+      return {
+        exerciseName: name,
+        type: "duration",
+        unit: "seconds",
+        value: finisherElapsedSeconds,
+      };
+    }
+
+    if (!/^[1-9]\d*$/.test(finisherRepetitionInput)) {
+      return null;
+    }
+
+    const repetitionCount = Number(finisherRepetitionInput);
+
+    if (!Number.isSafeInteger(repetitionCount)) {
+      return null;
+    }
+
+    return {
+      exerciseName: name,
+      type: "repetitions",
+      unit: performance.unit,
+      value: repetitionCount,
+    };
+  };
 
   const currentStreak = getCurrentStreak(workoutDayDate);
 
@@ -342,6 +418,23 @@ export default function Welcome() {
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
+  useEffect(() => {
+    if (finisherTimerStartedAt === null) {
+      return;
+    }
+
+    const updateElapsedSeconds = () => {
+      setFinisherElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - finisherTimerStartedAt) / 1000)),
+      );
+    };
+
+    updateElapsedSeconds();
+    const interval = window.setInterval(updateElapsedSeconds, 250);
+
+    return () => window.clearInterval(interval);
+  }, [finisherTimerStartedAt]);
+
   const startWorkout = () => {
     setScreen("workout");
     setCurrentExerciseIndex(0);
@@ -350,6 +443,7 @@ export default function Welcome() {
     setIsResting(false);
     setTimerSeconds(0);
     setTimerRunning(false);
+    resetFinisherPerformance();
   };
 
   useEffect(() => {
@@ -369,6 +463,10 @@ export default function Welcome() {
     if (!todayWorkout) return;
 
     if (isFinisher) {
+      if (!getCurrentFinisherResult()) {
+        return;
+      }
+
       setScreen("complete");
       return;
     }
@@ -387,6 +485,7 @@ export default function Welcome() {
         setIsFinisher(true);
         setTimerSeconds(0);
         setTimerRunning(false);
+        resetFinisherPerformance();
       }
     }
   };
@@ -404,8 +503,32 @@ export default function Welcome() {
     setTimerRunning(true);
   };
 
+  const startFinisherTimer = () => {
+    setFinisherTimerStartedAt(
+      Date.now() - finisherElapsedSeconds * 1000,
+    );
+  };
+
+  const stopFinisherTimer = () => {
+    if (finisherTimerStartedAt === null) {
+      return;
+    }
+
+    setFinisherElapsedSeconds(
+      Math.max(0, Math.floor((Date.now() - finisherTimerStartedAt) / 1000)),
+    );
+    setFinisherTimerStartedAt(null);
+  };
+
   const validateWorkout = () => {
     if (!selectedDifficultyRating || !todayWorkout) {
+      return;
+    }
+
+    const finisherResult = getCurrentFinisherResult();
+
+    if (!finisherResult) {
+      setScreen("workout");
       return;
     }
 
@@ -416,12 +539,14 @@ export default function Welcome() {
       difficultyRating: selectedDifficultyRating,
       session: todayWorkout.session,
       completedAt: new Date().toISOString(),
+      finisherResult,
     };
 
     localStorage.setItem(todayKey, JSON.stringify(workoutHistoryItem));
     setIsCompleted(true);
     setScreen("home");
     setSelectedDifficultyRating(null);
+    resetFinisherPerformance();
   };
 
   const increaseWorkoutLevel = (): void => {
@@ -855,6 +980,16 @@ export default function Welcome() {
     const currentExercise = getCurrentExercise();
     if (!currentExercise) return null;
 
+    const currentFinisherResult = isFinisher
+      ? getCurrentFinisherResult()
+      : null;
+    const latestFinisherResult = isFinisher
+      ? getLatestFinisherResult(
+          todayWorkout.finisher.name,
+          todayWorkout.finisher.performance.type,
+        )
+      : null;
+
     return (
       <>
         <div className="min-h-screen bg-gradient-to-b from-slate-800 to-slate-900 p-4 flex flex-col">
@@ -906,6 +1041,84 @@ export default function Welcome() {
                       </div>
                     )}
 
+                  {isFinisher && latestFinisherResult && (
+                    <div className="mb-6 rounded-xl bg-white/10 px-4 py-3 text-slate-200">
+                      Dernière fois :{" "}
+                      <span className="font-semibold text-white">
+                        {formatFinisherResult(latestFinisherResult)}
+                      </span>
+                    </div>
+                  )}
+
+                  {isFinisher &&
+                    todayWorkout.finisher.performance.type ===
+                      "repetitions" && (
+                      <div className="mx-auto max-w-xs space-y-3">
+                        <label
+                          htmlFor="finisher-repetitions"
+                          className="block text-sm text-slate-300"
+                        >
+                          Nombre de{" "}
+                          {todayWorkout.finisher.performance.unit === "tours"
+                            ? "tours complets"
+                            : "répétitions réussies"}
+                        </label>
+                        <input
+                          id="finisher-repetitions"
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          step="1"
+                          value={finisherRepetitionInput}
+                          onChange={(event) =>
+                            setFinisherRepetitionInput(event.target.value)
+                          }
+                          placeholder="0"
+                          className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-4 text-center text-4xl text-white outline-none placeholder:text-slate-500 focus:border-white/50"
+                        />
+                      </div>
+                    )}
+
+                  {isFinisher &&
+                    todayWorkout.finisher.performance.type === "duration" && (
+                      <div className="space-y-5">
+                        <div className="font-mono text-7xl tabular-nums text-white">
+                          {formatDuration(finisherElapsedSeconds)}
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          {finisherTimerStartedAt === null ? (
+                            <button
+                              type="button"
+                              onClick={startFinisherTimer}
+                              className="rounded-xl bg-green-500 px-6 py-3 text-white transition-colors hover:bg-green-600"
+                            >
+                              {finisherElapsedSeconds === 0
+                                ? "Démarrer"
+                                : "Reprendre"}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={stopFinisherTimer}
+                              className="rounded-xl bg-red-500 px-6 py-3 text-white transition-colors hover:bg-red-600"
+                            >
+                              Arrêter
+                            </button>
+                          )}
+                          {(finisherElapsedSeconds > 0 ||
+                            finisherTimerStartedAt !== null) && (
+                            <button
+                              type="button"
+                              onClick={resetFinisherPerformance}
+                              className="rounded-xl bg-white/20 px-6 py-3 text-white transition-colors hover:bg-white/30"
+                            >
+                              Recommencer
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                   {"time" in currentExercise && currentExercise.time && (
                     <div className="space-y-4">
                       {timerSeconds > 0 ? (
@@ -920,7 +1133,7 @@ export default function Welcome() {
 
                       {!timerRunning && timerSeconds === 0 && (
                         <button
-                          onClick={() => startTimer(currentExercise.time)}
+                          onClick={() => startTimer(currentExercise.time!)}
                           className="bg-white/20 text-white px-8 py-3 rounded-xl hover:bg-white/30 transition-colors"
                         >
                           Démarrer le timer
@@ -933,9 +1146,10 @@ export default function Welcome() {
 
               <button
                 onClick={handleNext}
-                className="w-full bg-white text-slate-900 py-5 rounded-2xl text-xl hover:bg-slate-100 transition-colors"
+                disabled={isFinisher && currentFinisherResult === null}
+                className="w-full bg-white text-slate-900 py-5 rounded-2xl text-xl hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
               >
-                Suivant
+                {isFinisher ? "Terminer le finisher" : "Suivant"}
               </button>
             </div>
           </div>

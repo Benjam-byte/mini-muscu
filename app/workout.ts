@@ -1,3 +1,38 @@
+export type FinisherPerformance =
+  | {
+      type: "repetitions";
+      unit: "repetitions" | "tours";
+    }
+  | {
+      type: "duration";
+      unit: "seconds";
+    };
+
+export type WorkoutExercise = {
+  name: string;
+  reps?: string;
+  time?: string;
+  instruction?: string;
+};
+
+export type WorkoutFinisher = {
+  name: string;
+  instruction: string;
+  performance: FinisherPerformance;
+};
+
+export type DailyWorkout = {
+  day: string;
+  session: string;
+  circuit_repetitions: number;
+  exercises: WorkoutExercise[];
+  finisher: WorkoutFinisher;
+};
+
+export type WorkoutPlan = {
+  weekly_plan: DailyWorkout[];
+};
+
 export const EXERCISE_IMAGE_BY_NAME: Record<string, string> = {
   Pompes: "/exercises/pompes.png",
   "Pompes lentes": "/exercises/pompes.png",
@@ -39,7 +74,7 @@ export const EXERCISE_IMAGE_BY_NAME: Record<string, string> = {
   "Montées de mollets": "/exercises/montees-mollets.png",
 };
 
-export const WORKOUT_PLAN = {
+export const WORKOUT_PLAN: WorkoutPlan = {
   weekly_plan: [
     {
       day: "Monday",
@@ -55,6 +90,7 @@ export const WORKOUT_PLAN = {
       finisher: {
         name: "Pompes lentes",
         instruction: "jusqu'à quasi échec",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -71,6 +107,7 @@ export const WORKOUT_PLAN = {
       finisher: {
         name: "Squat hold",
         instruction: "statique max",
+        performance: { type: "duration", unit: "seconds" },
       },
     },
     {
@@ -87,6 +124,7 @@ export const WORKOUT_PLAN = {
       finisher: {
         name: "Pompes",
         instruction: "max",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -103,6 +141,7 @@ export const WORKOUT_PLAN = {
       finisher: {
         name: "Gainage",
         instruction: "max",
+        performance: { type: "duration", unit: "seconds" },
       },
     },
     {
@@ -119,6 +158,7 @@ export const WORKOUT_PLAN = {
       finisher: {
         name: "Squat lent",
         instruction: "max",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -135,12 +175,13 @@ export const WORKOUT_PLAN = {
       finisher: {
         name: "Pompes + squats",
         instruction: "sans pause max",
+        performance: { type: "repetitions", unit: "tours" },
       },
     },
   ],
 };
 
-export const WORKOUT_PLAN_ENTRAINE = {
+export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
   weekly_plan: [
     {
       day: "Monday",
@@ -156,6 +197,7 @@ export const WORKOUT_PLAN_ENTRAINE = {
       finisher: {
         name: "Pompes lentes",
         instruction: "jusqu'à quasi échec",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -172,6 +214,7 @@ export const WORKOUT_PLAN_ENTRAINE = {
       finisher: {
         name: "Squat hold",
         instruction: "statique max",
+        performance: { type: "duration", unit: "seconds" },
       },
     },
     {
@@ -188,6 +231,7 @@ export const WORKOUT_PLAN_ENTRAINE = {
       finisher: {
         name: "Pompes",
         instruction: "max",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -204,6 +248,7 @@ export const WORKOUT_PLAN_ENTRAINE = {
       finisher: {
         name: "Gainage",
         instruction: "max",
+        performance: { type: "duration", unit: "seconds" },
       },
     },
     {
@@ -220,6 +265,7 @@ export const WORKOUT_PLAN_ENTRAINE = {
       finisher: {
         name: "Squat lent",
         instruction: "max",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -236,12 +282,13 @@ export const WORKOUT_PLAN_ENTRAINE = {
       finisher: {
         name: "Pompes + squats",
         instruction: "sans pause max",
+        performance: { type: "repetitions", unit: "tours" },
       },
     },
   ],
 };
 
-export const WORKOUT_PLAN_BIEN_ENTRAINE = {
+export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
   weekly_plan: [
     {
       day: "Monday",
@@ -257,6 +304,7 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE = {
       finisher: {
         name: "Pompes lentes",
         instruction: "jusqu'à quasi échec",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -273,6 +321,7 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE = {
       finisher: {
         name: "Squat hold",
         instruction: "statique max",
+        performance: { type: "duration", unit: "seconds" },
       },
     },
     {
@@ -289,6 +338,7 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE = {
       finisher: {
         name: "Pompes",
         instruction: "max",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -305,6 +355,7 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE = {
       finisher: {
         name: "Gainage",
         instruction: "max",
+        performance: { type: "duration", unit: "seconds" },
       },
     },
     {
@@ -321,6 +372,7 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE = {
       finisher: {
         name: "Squat lent",
         instruction: "max",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -337,12 +389,13 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE = {
       finisher: {
         name: "Pompes + squats",
         instruction: "sans pause max",
+        performance: { type: "repetitions", unit: "tours" },
       },
     },
   ],
 };
 
-export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU = {
+export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
   weekly_plan: [
     {
       day: "Monday",
@@ -358,6 +411,7 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU = {
       finisher: {
         name: "Pompes lentes",
         instruction: "jusqu'à échec",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -374,6 +428,7 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU = {
       finisher: {
         name: "Squat hold",
         instruction: "statique max",
+        performance: { type: "duration", unit: "seconds" },
       },
     },
     {
@@ -390,6 +445,7 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU = {
       finisher: {
         name: "Pompes",
         instruction: "max",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -406,6 +462,7 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU = {
       finisher: {
         name: "Gainage",
         instruction: "max",
+        performance: { type: "duration", unit: "seconds" },
       },
     },
     {
@@ -422,6 +479,7 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU = {
       finisher: {
         name: "Squat lent",
         instruction: "max",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -438,6 +496,7 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU = {
       finisher: {
         name: "Pompes + squats",
         instruction: "sans pause max",
+        performance: { type: "repetitions", unit: "tours" },
       },
     },
   ],
