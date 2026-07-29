@@ -21,7 +21,7 @@ import {
   type WorkoutHistoryItem,
   type WorkoutLevel,
 } from "../workoutHistory";
-import { StreakCard } from "./streakCard";
+import { StreakCard, type StreakRunSummary } from "./streakCard";
 import { MonthStatsCard, type MonthStats } from "./monthStratsCard";
 import { WorkoutPlanPicker } from "./workoutPlanPicker";
 import { ExercisePreviewButton, EyeIcon } from "./eyeIcon";
@@ -33,6 +33,9 @@ const REST_DURATION = 30;
 const WORKOUT_DAY_START_HOUR = 6;
 const SELECTED_WORKOUT_PLAN_KEY = "selected_workout_plan";
 const LEVEL_UP_SUGGESTION_DISMISSAL_DURATION = 7 * 24 * 60 * 60 * 1000;
+const STREAK_PROTECTION_KEY = "streak_protection";
+const MAX_STREAK_JOKER_COUNT = 4;
+const STREAK_JOKER_REGENERATION_DURATION = 7 * 24 * 60 * 60 * 1000;
 
 const WORKOUT_PLAN_BY_LEVEL: Record<WorkoutLevel, typeof WORKOUT_PLAN> = {
   base: WORKOUT_PLAN,
@@ -76,6 +79,19 @@ const formatFinisherResult = (finisherResult: FinisherResult): string => {
   return `${finisherResult.value} ${unitLabel}`;
 };
 
+type StreakProtectionState = {
+  jokerCount: number;
+  lastRegeneratedAt: string;
+  protectedDateKeyList: string[];
+  bestStreak: number;
+};
+
+type StreakAnalysis = {
+  streak: number;
+  protectionState: StreakProtectionState;
+  bestStreakRunList: StreakRunSummary[];
+};
+
 export default function Welcome() {
   const [screen, setScreen] = useState<Screen>("home");
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -101,6 +117,61 @@ export default function Welcome() {
   const [selectedExerciseName, setSelectedExerciseName] = useState<
     string | null
   >(null);
+  const [isJokerPopoverOpen, setIsJokerPopoverOpen] = useState(false);
+  const [isJokerModalOpen, setIsJokerModalOpen] = useState(false);
+  const [jokerCalendarMonth, setJokerCalendarMonth] = useState(new Date());
+  const [selectedJokerDateKey, setSelectedJokerDateKey] = useState<
+    string | null
+  >(null);
+
+  function getSavedStreakProtectionState(): StreakProtectionState {
+    const savedStreakProtectionState = localStorage.getItem(
+      STREAK_PROTECTION_KEY,
+    );
+
+    if (savedStreakProtectionState) {
+      try {
+        const parsedState = JSON.parse(
+          savedStreakProtectionState,
+        ) as Partial<StreakProtectionState>;
+
+        return {
+          jokerCount:
+            typeof parsedState.jokerCount === "number"
+              ? Math.min(
+                  MAX_STREAK_JOKER_COUNT,
+                  Math.max(0, parsedState.jokerCount),
+                )
+              : MAX_STREAK_JOKER_COUNT,
+          lastRegeneratedAt:
+            typeof parsedState.lastRegeneratedAt === "string"
+              ? parsedState.lastRegeneratedAt
+              : new Date().toISOString(),
+          protectedDateKeyList: Array.isArray(parsedState.protectedDateKeyList)
+            ? parsedState.protectedDateKeyList.filter(
+                (dateKey): dateKey is string => typeof dateKey === "string",
+              )
+            : [],
+          bestStreak:
+            typeof parsedState.bestStreak === "number"
+              ? Math.max(0, parsedState.bestStreak)
+              : 0,
+        };
+      } catch (error) {
+        console.error("Unable to parse streak protection state", error);
+      }
+    }
+
+    return {
+      jokerCount: 0,
+      lastRegeneratedAt: new Date().toISOString(),
+      protectedDateKeyList: [],
+      bestStreak: 0,
+    };
+  }
+
+  const [streakProtectionState, setStreakProtectionState] =
+    useState<StreakProtectionState>(getSavedStreakProtectionState);
 
   const openExerciseIllustration = (exerciseName: string) => {
     setSelectedExerciseName(exerciseName);
@@ -169,7 +240,171 @@ export default function Welcome() {
     );
   }
 
-  function getCurrentStreak(workoutDayDate: Date) {
+  function getDateFromWorkoutDoneKey(dateKey: string) {
+    const datePart = dateKey.replace("workout_done_", "");
+    const [year, month, day] = datePart.split("-").map(Number);
+
+    if (!year || !month || !day) {
+      return null;
+    }
+
+    return new Date(year, month - 1, day);
+  }
+
+  function getCompletedOrProtectedDateKeyList(
+    protectionState: StreakProtectionState,
+  ) {
+    const dateKeySet = new Set<string>(protectionState.protectedDateKeyList);
+
+    for (let index = 0; index < localStorage.length; index++) {
+      const storageKey = localStorage.key(index);
+
+      if (!storageKey || !storageKey.startsWith("workout_done_")) {
+        continue;
+      }
+
+      if (isWorkoutCompleted(storageKey)) {
+        dateKeySet.add(storageKey);
+      }
+    }
+
+    return [...dateKeySet].sort();
+  }
+
+  function regenerateStreakJokers(
+    protectionState: StreakProtectionState,
+    workoutDayDate: Date,
+  ): StreakProtectionState {
+    const lastRegeneratedAtTime = new Date(
+      protectionState.lastRegeneratedAt,
+    ).getTime();
+
+    if (!Number.isFinite(lastRegeneratedAtTime)) {
+      return {
+        ...protectionState,
+        lastRegeneratedAt: workoutDayDate.toISOString(),
+      };
+    }
+
+    const elapsedWeekCount = Math.floor(
+      (workoutDayDate.getTime() - lastRegeneratedAtTime) /
+        STREAK_JOKER_REGENERATION_DURATION,
+    );
+
+    if (elapsedWeekCount <= 0) {
+      return protectionState;
+    }
+
+    return {
+      ...protectionState,
+      jokerCount: Math.min(
+        MAX_STREAK_JOKER_COUNT,
+        protectionState.jokerCount + elapsedWeekCount,
+      ),
+      lastRegeneratedAt: workoutDayDate.toISOString(),
+    };
+  }
+
+  function getBestStreakRunList(
+    protectionState: StreakProtectionState,
+    workoutDayDate: Date,
+  ): StreakRunSummary[] {
+    const protectedDateKeySet = new Set(protectionState.protectedDateKeyList);
+    const completedOrProtectedDateKeyList =
+      getCompletedOrProtectedDateKeyList(protectionState);
+    const firstDateKey = completedOrProtectedDateKeyList[0];
+    const firstDate = firstDateKey
+      ? getDateFromWorkoutDoneKey(firstDateKey)
+      : null;
+
+    if (!firstDate) {
+      return [];
+    }
+
+    const currentWorkoutDay = new Date(
+      workoutDayDate.getFullYear(),
+      workoutDayDate.getMonth(),
+      workoutDayDate.getDate(),
+    );
+    const todayDateKey = getWorkoutDoneKey(currentWorkoutDay);
+    const shouldSkipToday = !isWorkoutCompleted(todayDateKey);
+    const streakRunList: StreakRunSummary[] = [];
+    let currentRunDateKeyList: string[] = [];
+    let currentRunJokerDateKeyList: string[] = [];
+
+    const pushCurrentRun = () => {
+      if (currentRunDateKeyList.length === 0) {
+        return;
+      }
+
+      streakRunList.push({
+        length: currentRunDateKeyList.length,
+        startDateKey: currentRunDateKeyList[0],
+        endDateKey: currentRunDateKeyList[currentRunDateKeyList.length - 1],
+        jokerDateKeyList: currentRunJokerDateKeyList,
+      });
+
+      currentRunDateKeyList = [];
+      currentRunJokerDateKeyList = [];
+    };
+
+    for (
+      let date = new Date(
+        firstDate.getFullYear(),
+        firstDate.getMonth(),
+        firstDate.getDate(),
+      );
+      date <= currentWorkoutDay;
+      date.setDate(date.getDate() + 1)
+    ) {
+      if (!hasWorkoutPlanned(date)) {
+        continue;
+      }
+
+      const dateKey = getWorkoutDoneKey(date);
+
+      if (shouldSkipToday && dateKey === todayDateKey) {
+        continue;
+      }
+
+      if (
+        isWorkoutCompleted(dateKey) ||
+        protectedDateKeySet.has(dateKey)
+      ) {
+        currentRunDateKeyList.push(dateKey);
+
+        if (protectedDateKeySet.has(dateKey)) {
+          currentRunJokerDateKeyList.push(dateKey);
+        }
+
+        continue;
+      }
+
+      pushCurrentRun();
+    }
+
+    pushCurrentRun();
+
+    return streakRunList
+      .sort((firstRun, secondRun) => {
+        if (firstRun.length !== secondRun.length) {
+          return secondRun.length - firstRun.length;
+        }
+
+        return secondRun.endDateKey.localeCompare(firstRun.endDateKey);
+      })
+      .slice(0, 5);
+  }
+
+  function getStreakAnalysis(
+    workoutDayDate: Date,
+    currentProtectionState: StreakProtectionState,
+  ): StreakAnalysis {
+    let protectionState = regenerateStreakJokers(
+      currentProtectionState,
+      workoutDayDate,
+    );
+    const protectedDateKeySet = new Set(protectionState.protectedDateKeyList);
     let streak = 0;
     const dateToCheck = new Date(workoutDayDate);
 
@@ -179,23 +414,44 @@ export default function Welcome() {
       dateToCheck.setDate(dateToCheck.getDate() - 1);
     }
 
-    while (true) {
+    for (let checkedDayCount = 0; checkedDayCount < 366; checkedDayCount++) {
       if (!hasWorkoutPlanned(dateToCheck)) {
         dateToCheck.setDate(dateToCheck.getDate() - 1);
         continue;
       }
 
-      const isWorkoutDone = isWorkoutCompleted(getWorkoutDoneKey(dateToCheck));
+      const dateKey = getWorkoutDoneKey(dateToCheck);
+      const isWorkoutDone = isWorkoutCompleted(dateKey);
+      const isWorkoutProtected = protectedDateKeySet.has(dateKey);
 
-      if (!isWorkoutDone) {
-        break;
+      if (isWorkoutDone || isWorkoutProtected) {
+        streak += 1;
+        dateToCheck.setDate(dateToCheck.getDate() - 1);
+        continue;
       }
 
-      streak += 1;
-      dateToCheck.setDate(dateToCheck.getDate() - 1);
+      break;
     }
 
-    return streak;
+    const bestStreakRunList = getBestStreakRunList(
+      protectionState,
+      workoutDayDate,
+    );
+    const bestCurrentRunLength = bestStreakRunList[0]?.length ?? 0;
+    protectionState = {
+      ...protectionState,
+      bestStreak: Math.max(
+        protectionState.bestStreak,
+        streak,
+        bestCurrentRunLength,
+      ),
+    };
+
+    return {
+      streak,
+      protectionState,
+      bestStreakRunList,
+    };
   }
 
   const handleWorkoutLevelChange = (workoutLevel: WorkoutLevel) => {
@@ -269,7 +525,11 @@ export default function Welcome() {
     };
   };
 
-  const currentStreak = getCurrentStreak(workoutDayDate);
+  const streakAnalysis = getStreakAnalysis(
+    workoutDayDate,
+    streakProtectionState,
+  );
+  const currentStreak = streakAnalysis.streak;
 
   const frenchDayNames = [
     "Dimanche",
@@ -382,6 +642,20 @@ export default function Welcome() {
       setNotificationPermission(Notification.permission);
     }
   }, [todayKey]);
+
+  useEffect(() => {
+    const currentProtectionState = JSON.stringify(streakProtectionState);
+    const nextProtectionState = JSON.stringify(
+      streakAnalysis.protectionState,
+    );
+
+    if (currentProtectionState === nextProtectionState) {
+      return;
+    }
+
+    localStorage.setItem(STREAK_PROTECTION_KEY, nextProtectionState);
+    setStreakProtectionState(streakAnalysis.protectionState);
+  }, [streakAnalysis.protectionState, streakProtectionState]);
 
   useEffect(() => {
     const dismissedAt = localStorage.getItem(
@@ -589,9 +863,13 @@ export default function Welcome() {
     return days;
   };
 
+  const isWorkoutProtectedByJoker = (dateKey: string) =>
+    streakAnalysis.protectionState.protectedDateKeyList.includes(dateKey);
+
   const getWorkoutStatus = (date: Date) => {
     const dateKey = `workout_done_${formatWorkoutDateKey(date)}`;
     const isDone = isWorkoutCompleted(dateKey);
+    const isProtectedByJoker = isWorkoutProtectedByJoker(dateKey);
 
     const dayName = dayNames[date.getDay()];
     const isRestDay = dayName === "Thursday";
@@ -611,9 +889,79 @@ export default function Welcome() {
     const isToday = calendarDay.getTime() === currentWorkoutDay.getTime();
 
     if (isDone) return "done";
+    if (isProtectedByJoker) return "protected";
     if (isRestDay) return "rest";
     if (isPast && !isToday) return "missed";
     return "future";
+  };
+
+  const openJokerModal = () => {
+    setJokerCalendarMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1),
+    );
+    setSelectedJokerDateKey(null);
+    setIsJokerModalOpen(true);
+  };
+
+  const closeJokerModal = () => {
+    setSelectedJokerDateKey(null);
+    setIsJokerModalOpen(false);
+  };
+
+  const changeJokerCalendarMonth = (monthOffset: number) => {
+    setJokerCalendarMonth(
+      new Date(
+        jokerCalendarMonth.getFullYear(),
+        jokerCalendarMonth.getMonth() + monthOffset,
+        1,
+      ),
+    );
+    setSelectedJokerDateKey(null);
+  };
+
+  const getJokerPreviewAnalysis = (
+    dateKey: string | null,
+  ): StreakAnalysis | null => {
+    if (
+      !dateKey ||
+      streakAnalysis.protectionState.jokerCount <= 0
+    ) {
+      return null;
+    }
+
+    const selectedDate = getDateFromWorkoutDoneKey(dateKey);
+
+    if (!selectedDate || getWorkoutStatus(selectedDate) !== "missed") {
+      return null;
+    }
+
+    const protectedDateKeyList = [
+      ...new Set([
+        ...streakAnalysis.protectionState.protectedDateKeyList,
+        dateKey,
+      ]),
+    ].sort();
+
+    return getStreakAnalysis(workoutDayDate, {
+      ...streakAnalysis.protectionState,
+      jokerCount: streakAnalysis.protectionState.jokerCount - 1,
+      protectedDateKeyList,
+    });
+  };
+
+  const applySelectedJoker = () => {
+    const previewAnalysis = getJokerPreviewAnalysis(selectedJokerDateKey);
+
+    if (!previewAnalysis) {
+      return;
+    }
+
+    localStorage.setItem(
+      STREAK_PROTECTION_KEY,
+      JSON.stringify(previewAnalysis.protectionState),
+    );
+    setStreakProtectionState(previewAnalysis.protectionState);
+    closeJokerModal();
   };
 
   const previousMonth = () => {
@@ -650,11 +998,25 @@ export default function Welcome() {
 
   if (screen === "history") {
     const days = getDaysInMonth(currentMonth);
+    const jokerCalendarDays = getDaysInMonth(jokerCalendarMonth);
     const monthStats = getMonthStats(currentMonth);
     const monthName = currentMonth.toLocaleDateString("fr-FR", {
       month: "long",
       year: "numeric",
     });
+    const jokerCalendarMonthName = jokerCalendarMonth.toLocaleDateString(
+      "fr-FR",
+      {
+        month: "long",
+        year: "numeric",
+      },
+    );
+    const jokerPreviewAnalysis = getJokerPreviewAnalysis(
+      selectedJokerDateKey,
+    );
+    const selectedJokerDate = selectedJokerDateKey
+      ? getDateFromWorkoutDoneKey(selectedJokerDateKey)
+      : null;
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
@@ -674,6 +1036,23 @@ export default function Welcome() {
               →
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={openJokerModal}
+            className="mb-6 flex w-full items-center justify-between rounded-2xl bg-amber-100 px-5 py-4 text-left text-amber-900 transition-colors hover:bg-amber-200"
+          >
+            <span>
+              <span className="block text-base">Utiliser un joker</span>
+              <span className="mt-0.5 block text-xs text-amber-700">
+                Choisir manuellement un jour oublié
+              </span>
+            </span>
+            <span className="rounded-full bg-white/70 px-3 py-1 text-sm">
+              🃏 {streakAnalysis.protectionState.jokerCount}/
+              {MAX_STREAK_JOKER_COUNT}
+            </span>
+          </button>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="grid grid-cols-7 gap-2 mb-4">
@@ -707,6 +1086,9 @@ export default function Welcome() {
                 if (status === "done") {
                   bgColor = "bg-green-100";
                   textColor = "text-green-700";
+                } else if (status === "protected") {
+                  bgColor = "bg-amber-100";
+                  textColor = "text-amber-700";
                 } else if (status === "missed") {
                   bgColor = "bg-red-100";
                   textColor = "text-red-700";
@@ -725,6 +1107,9 @@ export default function Welcome() {
                     className={`aspect-square flex flex-col items-center justify-center rounded-lg ${bgColor} ${textColor} ${borderColor} text-sm`}
                   >
                     <span>{day.getDate()}</span>
+                    {status === "protected" && (
+                      <span className="text-[10px] leading-tight">🃏</span>
+                    )}
                     {workoutHistoryItem && (
                       <span className="text-[10px] leading-tight">
                         {
@@ -752,6 +1137,12 @@ export default function Welcome() {
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-red-100"></div>
                 <span className="text-slate-600">Oublié</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-4 w-4 items-center justify-center rounded bg-amber-100 text-[10px]">
+                  🃏
+                </div>
+                <span className="text-slate-600">Joker</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-blue-50"></div>
@@ -789,6 +1180,191 @@ export default function Welcome() {
             </button>
           </div>
         </div>
+
+        {isJokerModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 p-4 sm:items-center">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="joker-modal-title"
+              className="mx-auto max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs text-amber-700">
+                    🃏 {streakAnalysis.protectionState.jokerCount} disponible
+                    {streakAnalysis.protectionState.jokerCount !== 1 ? "s" : ""}
+                  </p>
+                  <h2
+                    id="joker-modal-title"
+                    className="mt-1 text-2xl text-slate-900"
+                  >
+                    Utiliser un joker
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeJokerModal}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  aria-label="Fermer"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+                <p>
+                  Un joker protège un entraînement oublié et peut reconnecter
+                  ta streak.
+                </p>
+                <p className="mt-2 text-xs text-amber-700">
+                  Le jour compte dans la streak, mais reste distinct d’une
+                  séance réellement terminée dans tes statistiques.
+                </p>
+              </div>
+
+              {streakAnalysis.protectionState.jokerCount === 0 ? (
+                <p className="mt-5 rounded-2xl border border-slate-200 p-4 text-sm text-slate-600">
+                  Aucun joker disponible pour le moment. Tu en récupères un
+                  tous les 7 jours, avec un maximum de{" "}
+                  {MAX_STREAK_JOKER_COUNT}.
+                </p>
+              ) : (
+                <>
+                  <p className="mt-5 text-sm text-slate-600">
+                    Sélectionne un jour d’entraînement oublié :
+                  </p>
+
+                  <div className="mt-3 rounded-2xl border border-slate-200 p-4">
+                    <div className="mb-4 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => changeJokerCalendarMonth(-1)}
+                        className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+                        aria-label="Mois précédent"
+                      >
+                        ←
+                      </button>
+                      <h3 className="capitalize text-slate-800">
+                        {jokerCalendarMonthName}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => changeJokerCalendarMonth(1)}
+                        className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+                        aria-label="Mois suivant"
+                      >
+                        →
+                      </button>
+                    </div>
+
+                    <div className="mb-2 grid grid-cols-7 gap-2">
+                      {["L", "M", "M", "J", "V", "S", "D"].map(
+                        (dayLabel, index) => (
+                          <div
+                            key={index}
+                            className="py-1 text-center text-[10px] text-slate-400"
+                          >
+                            {dayLabel}
+                          </div>
+                        ),
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2">
+                      {jokerCalendarDays.map((day, index) => {
+                        if (!day) {
+                          return (
+                            <div key={index} className="aspect-square" />
+                          );
+                        }
+
+                        const dateKey = getWorkoutDoneKey(day);
+                        const status = getWorkoutStatus(day);
+                        const isEligible = status === "missed";
+                        const isSelected =
+                          selectedJokerDateKey === dateKey;
+
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            disabled={!isEligible}
+                            onClick={() => setSelectedJokerDateKey(dateKey)}
+                            className={
+                              isSelected
+                                ? "aspect-square rounded-lg bg-amber-500 text-sm text-white ring-2 ring-amber-700 ring-offset-2"
+                                : isEligible
+                                  ? "aspect-square rounded-lg bg-red-100 text-sm text-red-700 transition-colors hover:bg-amber-100 hover:text-amber-800"
+                                  : status === "protected"
+                                    ? "aspect-square rounded-lg bg-amber-100 text-sm text-amber-700"
+                                    : status === "done"
+                                      ? "aspect-square rounded-lg bg-green-50 text-sm text-green-600"
+                                      : "aspect-square rounded-lg bg-slate-50 text-sm text-slate-300"
+                            }
+                          >
+                            <span className="block">{day.getDate()}</span>
+                            {status === "protected" && (
+                              <span className="block text-[9px]">🃏</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="mt-4 text-xs text-slate-500">
+                      Les jours rouges sont les jours éligibles.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {selectedJokerDate && jokerPreviewAnalysis && (
+                <div
+                  className={`mt-4 rounded-2xl p-4 text-sm ${
+                    jokerPreviewAnalysis.streak > currentStreak
+                      ? "bg-green-50 text-green-900"
+                      : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  <p className="font-medium">
+                    {selectedJokerDate.toLocaleDateString("fr-FR", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <p className="mt-2 leading-relaxed">
+                    {jokerPreviewAnalysis.streak > currentStreak
+                      ? currentStreak === 0
+                        ? `Ce joker redémarrera ta streak à ${jokerPreviewAnalysis.streak} jour${jokerPreviewAnalysis.streak > 1 ? "s" : ""}.`
+                        : `Ta streak passera de ${currentStreak} à ${jokerPreviewAnalysis.streak} jours.`
+                      : "Ce joker ne redémarrera pas ta streak actuelle : un autre jour oublié la sépare encore de tes séances récentes."}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeJokerModal}
+                  className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-slate-700 hover:bg-slate-200"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={applySelectedJoker}
+                  disabled={!jokerPreviewAnalysis}
+                  className="flex-1 rounded-xl bg-amber-500 px-4 py-3 text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  Valider
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -797,7 +1373,45 @@ export default function Welcome() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
         <div className="max-w-md mx-auto pt-2">
-          <h1 className="text-3xl mb-2 text-slate-800">Routine 15min</h1>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h1 className="text-3xl text-slate-800">Routine 15min</h1>
+
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  setIsJokerPopoverOpen(
+                    (currentIsJokerPopoverOpen) =>
+                      !currentIsJokerPopoverOpen,
+                  )
+                }
+                className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition-colors hover:bg-amber-100"
+                aria-label="Voir les jokers de streak"
+              >
+                <span aria-hidden="true">🃏</span>
+                <span>
+                  {streakAnalysis.protectionState.jokerCount}/
+                  {MAX_STREAK_JOKER_COUNT}
+                </span>
+              </button>
+
+              {isJokerPopoverOpen && (
+                <div className="absolute right-0 top-10 z-20 w-60 rounded-xl border border-amber-100 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
+                  <p className="text-amber-800">
+                    Un joker protège une séance prévue oubliée.
+                  </p>
+                  <p className="mt-1">
+                    Tu en récupères 1 tous les 7 jours, jusqu'à{" "}
+                    {MAX_STREAK_JOKER_COUNT} en stock.
+                  </p>
+                  <p className="mt-1">
+                    Ils ne sont jamais utilisés automatiquement : active-les
+                    depuis l’historique.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
           <p className="text-slate-500 mb-2">
             {today.toLocaleDateString("fr-FR", {
               weekday: "long",
@@ -806,7 +1420,14 @@ export default function Welcome() {
             })}
           </p>
           <div className="mb-6">
-            <StreakCard streak={currentStreak} />
+            <StreakCard
+              streak={currentStreak}
+              bestStreak={streakAnalysis.protectionState.bestStreak}
+              consumedJokerCount={
+                streakAnalysis.protectionState.protectedDateKeyList.length
+              }
+              bestStreakRunList={streakAnalysis.bestStreakRunList}
+            />
           </div>
 
           {shouldShowLevelUpSuggestion &&
