@@ -36,6 +36,8 @@ const LEVEL_UP_SUGGESTION_DISMISSAL_DURATION = 7 * 24 * 60 * 60 * 1000;
 const STREAK_PROTECTION_KEY = "streak_protection";
 const MAX_STREAK_JOKER_COUNT = 4;
 const STREAK_JOKER_REGENERATION_DURATION = 7 * 24 * 60 * 60 * 1000;
+const MISSED_DAY_RESTORE_TAP_COUNT = 4;
+const MISSED_DAY_RESTORE_TAP_DELAY = 900; // ms
 
 const WORKOUT_PLAN_BY_LEVEL: Record<WorkoutLevel, typeof WORKOUT_PLAN> = {
   base: WORKOUT_PLAN,
@@ -107,6 +109,11 @@ export default function Welcome() {
     number | null
   >(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [missedDayRestoreTapState, setMissedDayRestoreTapState] = useState<{
+    dateKey: string;
+    count: number;
+    lastTappedAt: number;
+  }>({ dateKey: "", count: 0, lastTappedAt: 0 });
   const [selectedDifficultyRating, setSelectedDifficultyRating] =
     useState<DifficultyRating | null>(null);
   const [shouldShowLevelUpSuggestion, setShouldShowLevelUpSuggestion] =
@@ -895,6 +902,58 @@ export default function Welcome() {
     return "future";
   };
 
+  const restoreMissedWorkout = (date: Date) => {
+    const dayName = dayNames[date.getDay()];
+    const plannedWorkout = selectedWorkoutPlan.weekly_plan.find(
+      (workout) => workout.day === dayName,
+    );
+    if (!plannedWorkout) return;
+
+    const dateKey = getWorkoutDoneKey(date);
+    const completedAt = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      12,
+      0,
+      0,
+      0,
+    );
+    const workoutHistoryItem: WorkoutHistoryItem = {
+      dateKey,
+      isCompleted: true,
+      workoutLevel: currentWorkoutLevel,
+      difficultyRating: 3,
+      session: plannedWorkout.session,
+      completedAt: completedAt.toISOString(),
+    };
+
+    localStorage.setItem(dateKey, JSON.stringify(workoutHistoryItem));
+    setMissedDayRestoreTapState({ dateKey: "", count: 0, lastTappedAt: 0 });
+    if (dateKey === todayKey) setIsCompleted(true);
+  };
+
+  const handleHistoryDayTap = (date: Date, status: string) => {
+    if (status !== "missed") return;
+
+    const dateKey = getWorkoutDoneKey(date);
+    const now = Date.now();
+    const isSameTapSequence =
+      missedDayRestoreTapState.dateKey === dateKey &&
+      now - missedDayRestoreTapState.lastTappedAt <=
+        MISSED_DAY_RESTORE_TAP_DELAY;
+    const nextTapCount = isSameTapSequence
+      ? missedDayRestoreTapState.count + 1
+      : 1;
+
+    if (nextTapCount >= MISSED_DAY_RESTORE_TAP_COUNT) {
+      restoreMissedWorkout(date);
+      return;
+    }
+
+    setMissedDayRestoreTapState({ dateKey, count: nextTapCount, lastTappedAt: now });
+  };
+
   const openJokerModal = () => {
     setJokerCalendarMonth(
       new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1),
@@ -1104,7 +1163,8 @@ export default function Welcome() {
                 return (
                   <div
                     key={idx}
-                    className={`aspect-square flex flex-col items-center justify-center rounded-lg ${bgColor} ${textColor} ${borderColor} text-sm`}
+                    onClick={() => handleHistoryDayTap(day, status)}
+                    className={`aspect-square flex flex-col items-center justify-center rounded-lg ${bgColor} ${textColor} ${borderColor} text-sm ${status === "missed" ? "cursor-pointer" : ""}`}
                   >
                     <span>{day.getDate()}</span>
                     {status === "protected" && (
