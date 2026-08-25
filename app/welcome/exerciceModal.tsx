@@ -116,6 +116,16 @@ export function ExerciseIllustrationModal({
             )}
           </div>
         </div>
+
+        <div className="shrink-0 border-t border-slate-100 bg-white p-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-xl bg-slate-800 px-4 py-3 text-white transition-colors hover:bg-slate-700"
+          >
+            J’ai compris
+          </button>
+        </div>
       </div>
     </div>
   );

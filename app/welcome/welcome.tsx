@@ -32,6 +32,8 @@ type Screen = "home" | "workout" | "complete" | "history";
 const REST_DURATION = 30;
 const WORKOUT_DAY_START_HOUR = 6;
 const SELECTED_WORKOUT_PLAN_KEY = "selected_workout_plan";
+const VIEWED_EXERCISE_HELP_NAME_LIST_KEY =
+  "viewed_exercise_help_name_list";
 const LEVEL_UP_SUGGESTION_DISMISSAL_DURATION = 7 * 24 * 60 * 60 * 1000;
 const STREAK_PROTECTION_KEY = "streak_protection";
 const MAX_STREAK_JOKER_COUNT = 4;
@@ -81,6 +83,47 @@ const formatFinisherResult = (finisherResult: FinisherResult): string => {
   return `${finisherResult.value} ${unitLabel}`;
 };
 
+const getSavedViewedExerciseHelpNameSet = (): Set<string> => {
+  try {
+    const savedExerciseNameList = localStorage.getItem(
+      VIEWED_EXERCISE_HELP_NAME_LIST_KEY,
+    );
+
+    if (!savedExerciseNameList) {
+      return new Set();
+    }
+
+    const parsedExerciseNameList = JSON.parse(savedExerciseNameList) as unknown;
+
+    if (!Array.isArray(parsedExerciseNameList)) {
+      return new Set();
+    }
+
+    return new Set(
+      parsedExerciseNameList.filter(
+        (exerciseName): exerciseName is string =>
+          typeof exerciseName === "string",
+      ),
+    );
+  } catch (error) {
+    console.error("Unable to parse viewed exercise help list", error);
+    return new Set();
+  }
+};
+
+const saveViewedExerciseHelpNameSet = (
+  viewedExerciseHelpNameSet: Set<string>,
+): void => {
+  try {
+    localStorage.setItem(
+      VIEWED_EXERCISE_HELP_NAME_LIST_KEY,
+      JSON.stringify([...viewedExerciseHelpNameSet]),
+    );
+  } catch (error) {
+    console.error("Unable to save viewed exercise help list", error);
+  }
+};
+
 type StreakProtectionState = {
   jokerCount: number;
   lastRegeneratedAt: string;
@@ -124,6 +167,9 @@ export default function Welcome() {
   const [selectedExerciseName, setSelectedExerciseName] = useState<
     string | null
   >(null);
+  const [viewedExerciseHelpNameSet, setViewedExerciseHelpNameSet] = useState<
+    Set<string>
+  >(getSavedViewedExerciseHelpNameSet);
   const [isJokerPopoverOpen, setIsJokerPopoverOpen] = useState(false);
   const [isJokerModalOpen, setIsJokerModalOpen] = useState(false);
   const [jokerCalendarMonth, setJokerCalendarMonth] = useState(new Date());
@@ -181,6 +227,17 @@ export default function Welcome() {
     useState<StreakProtectionState>(getSavedStreakProtectionState);
 
   const openExerciseIllustration = (exerciseName: string) => {
+    setViewedExerciseHelpNameSet((currentExerciseNameSet) => {
+      if (currentExerciseNameSet.has(exerciseName)) {
+        return currentExerciseNameSet;
+      }
+
+      const nextExerciseNameSet = new Set(currentExerciseNameSet);
+      nextExerciseNameSet.add(exerciseName);
+      saveViewedExerciseHelpNameSet(nextExerciseNameSet);
+
+      return nextExerciseNameSet;
+    });
     setSelectedExerciseName(exerciseName);
   };
 
@@ -1555,6 +1612,7 @@ export default function Welcome() {
                       <div className="flex items-center gap-2">
                         <ExercisePreviewButton
                           exerciseName={ex.name}
+                          hasUnseenHelp={!viewedExerciseHelpNameSet.has(ex.name)}
                           onClick={openExerciseIllustration}
                         />
                         <span className="text-slate-700">{ex.name}</span>
@@ -1661,6 +1719,10 @@ export default function Welcome() {
     const currentExercise = getCurrentExercise();
     if (!currentExercise) return null;
 
+    const hasUnseenCurrentExerciseHelp = !viewedExerciseHelpNameSet.has(
+      currentExercise.name,
+    );
+
     const currentFinisherResult = isFinisher
       ? getCurrentFinisherResult()
       : null;
@@ -1701,10 +1763,16 @@ export default function Welcome() {
                     onClick={() =>
                       openExerciseIllustration(currentExercise.name)
                     }
-                    aria-label={`Voir l'exercice ${currentExercise.name}`}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    aria-label={`Voir l'exercice ${currentExercise.name}${hasUnseenCurrentExerciseHelp ? ", aide non consultée" : ""}`}
+                    className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                   >
                     <EyeIcon />
+                    {hasUnseenCurrentExerciseHelp && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white"
+                      />
+                    )}
                   </button>
                 </div>
 
