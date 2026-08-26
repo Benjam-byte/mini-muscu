@@ -35,21 +35,29 @@ export type WorkoutPlan = {
 
 export const EXERCISE_IMAGE_BY_NAME: Record<string, string> = {
   Pompes: "/exercises/pompes.png",
+  "Pompes écartées": "/exercises/pompes.png",
   "Pompes lentes": "/exercises/pompes.png",
   "Pompes serrées lentes": "/exercises/pompes-serrées.png",
   "Pompes avec pause basse": "/exercises/pompes.png",
   "Pompes serrées avec pause basse": "/exercises/pompes-serrées.png",
   "Pompes archer assistées": "/exercises/pompes.png",
-  "Pompes archer": "/exercises/archer poimpe.png",
+  "Pompes archer": "/exercises/archer pompe.png",
 
+  Squats: "/exercises/squats.png",
   "Squats lents": "/exercises/squats.png",
   "Squats lents avec pause": "/exercises/squats.png",
+  Fentes: "/exercises/fentes.png",
+  "Fentes arrière": "/exercises/fentes.png",
   "Split squat hold": "/exercises/split squat hold.png",
   "Fentes bulgares lentes": "/exercises/fente-bulagres.png",
   "Fentes bulgares lentes avec pause": "/exercises/fente-bulagres.png",
   "Squat une jambe assisté": "/exercises/squat-jambe-assisté.png",
 
   "Reverse Snow Angels": "/exercises/reverse snow angel.png",
+  "Reverse Snow Angels lents": "/exercises/reverse snow angel.png",
+  "Reverse Snow Angels avec pause": "/exercises/reverse snow angel.png",
+  "Reverse Snow Angels en tension continue":
+    "/exercises/reverse snow angel.png",
   "W Hold au sol": "/exercises/w-hold.png",
 
   "Glute bridge": "/exercises/glute-bridge.png",
@@ -58,6 +66,7 @@ export const EXERCISE_IMAGE_BY_NAME: Record<string, string> = {
   "Glute bridge une jambe avec pause": "/exercises/unilateral glute bridge.png",
   "Glute bridge une jambe hold": "/exercises/unilateral glute bridge.png",
 
+  "Montées de mollets": "/exercises/montees-mollets.png",
   "Montées de mollets lentes": "/exercises/montees-mollets.png",
   "Montées de mollets une jambe": "/exercises/montees-mollets.png",
   "Montées de mollets une jambe avec pause": "/exercises/montees-mollets.png",
@@ -67,11 +76,15 @@ export const EXERCISE_IMAGE_BY_NAME: Record<string, string> = {
   "Planche latérale": "/exercises/gainage-latérale.png",
   "Planche latérale avec jambe levée":
     "/exercises/planche lateral jambe levee.png",
+  "Planche shoulder taps": "/exercises/planche-shoulder-taps.png",
   "Planche shoulder taps très lents": "/exercises/planche-shoulder-taps.png",
+  "Dead bug": "/exercises/dead bug.png",
   "Dead bug lent": "/exercises/dead bug.png",
   "Dead bug jambes tendues": "/exercises/dead bug.png",
+  "Bird dog": "/exercises/superman.png",
   "Bird dog lent": "/exercises/superman.png",
   "Bird dog avec pause": "/exercises/superman.png",
+  Superman: "/exercises/superman.png",
 
   "Wall sit": "/exercises/wall-sit.png",
 };
@@ -85,6 +98,16 @@ Position de planche, corps bien aligné :
 - garde les coudes légèrement orientés vers l’arrière ;
 - pousse dans les mains pour revenir en position haute ;
 - garde le ventre et les fessiers contractés.
+`,
+
+  "Pompes écartées": `
+Position de planche, avec les mains plus écartées que les épaules :
+
+- garde les doigts orientés vers l’avant ;
+- descends la poitrine entre les mains ;
+- garde les coudes légèrement orientés vers l’arrière ;
+- pousse dans les mains pour revenir en position haute ;
+- conserve le corps aligné et bien gainé.
 `,
 
   "Pompes lentes": `
@@ -147,6 +170,16 @@ Position de pompe avec les mains largement écartées :
 - alterne les côtés.
 `,
 
+  Squats: `
+Debout, pieds environ largeur des épaules :
+
+- pousse les hanches vers l’arrière ;
+- plie les genoux en gardant les talons au sol ;
+- descends aussi bas que possible confortablement ;
+- garde les genoux dans l’axe des pieds ;
+- pousse dans les jambes pour te relever.
+`,
+
   "Squats lents": `
 Debout, pieds environ largeur des épaules, à vitesse **très lente** :
 
@@ -165,6 +198,26 @@ Effectue un squat lent avec une pause en bas :
 - maintiens la position basse environ 2 secondes ;
 - garde le dos stable ;
 - remonte lentement sans rebond.
+`,
+
+  Fentes: `
+Debout, fais un pas vers l’avant :
+
+- descends verticalement en pliant les deux genoux ;
+- garde le pied avant entièrement au sol ;
+- garde le buste droit et le genou avant dans l’axe du pied ;
+- pousse dans le pied avant pour revenir debout ;
+- alterne les jambes après les répétitions prévues.
+`,
+
+  "Fentes arrière": `
+Debout, recule une jambe :
+
+- pose la pointe du pied derrière toi ;
+- descends verticalement en gardant le buste droit ;
+- garde le pied avant entièrement au sol ;
+- pousse dans la jambe avant pour revenir debout ;
+- alterne les jambes après les répétitions prévues.
 `,
 
   "Split squat hold": `
@@ -208,13 +261,43 @@ Tiens-toi légèrement à un support stable :
 `,
 
   "Reverse Snow Angels": `
-Allongé sur le ventre à vitesse **très lente** :
+Allongé sur le ventre :
 
 - garde les bras tendus devant toi ;
 - décolle légèrement les mains du sol ;
-- fais-les glisser lentement en arc de cercle jusqu’aux hanches ;
-- reviens lentement devant ;
+- déplace les bras en arc de cercle jusqu’aux hanches ;
+- reviens devant de façon contrôlée ;
 - garde les omoplates serrées.
+`,
+
+  "Reverse Snow Angels lents": `
+Allongé sur le ventre, garde les mains légèrement décollées :
+
+- tends les bras devant toi ;
+- déplace-les en arc de cercle vers les hanches pendant 3 secondes ;
+- garde les omoplates serrées ;
+- reviens devant pendant 3 secondes ;
+- conserve un mouvement fluide sans élan.
+`,
+
+  "Reverse Snow Angels avec pause": `
+Allongé sur le ventre, effectue chaque répétition lentement :
+
+- déplace les bras vers les hanches pendant 3 secondes ;
+- rapproche les omoplates ;
+- marque une pause de 1 seconde près des hanches ;
+- reviens devant pendant 3 secondes ;
+- garde la nuque dans une position naturelle.
+`,
+
+  "Reverse Snow Angels en tension continue": `
+Allongé sur le ventre, ne repose ni les mains ni les coudes :
+
+- déplace les bras vers les hanches pendant 3 secondes ;
+- maintiens la contraction 2 secondes près des hanches ;
+- reviens devant pendant 3 secondes ;
+- garde les omoplates actives pendant tout le mouvement ;
+- arrête la série si tu ne peux plus conserver une exécution propre.
 `,
 
   "W Hold au sol": `
@@ -275,6 +358,16 @@ Allongé sur le dos avec un seul pied au sol :
 - maintiens les hanches parallèles ;
 - contracte fortement le fessier ;
 - conserve la position jusqu’à la fin du temps prévu.
+`,
+
+  "Montées de mollets": `
+Debout, pieds parallèles :
+
+- garde le corps droit ;
+- monte sur la pointe des pieds ;
+- contracte les mollets en position haute ;
+- redescends jusqu’à poser les talons ;
+- évite de basculer vers l’avant ou l’arrière.
 `,
 
   "Montées de mollets lentes": `
@@ -347,6 +440,16 @@ En position de planche latérale :
 - change de côté après le temps prévu.
 `,
 
+  "Planche shoulder taps": `
+En position de planche bras tendus :
+
+- écarte légèrement les pieds pour être stable ;
+- décolle une main et touche l’épaule opposée ;
+- repose la main sous l’épaule ;
+- limite la rotation du bassin ;
+- alterne les côtés.
+`,
+
   "Planche shoulder taps très lents": `
 En position de planche bras tendus, à vitesse **très lente** :
 
@@ -354,6 +457,16 @@ En position de planche bras tendus, à vitesse **très lente** :
 - décolle une main ;
 - touche lentement l’épaule opposée ;
 - repose la main sans faire tourner le bassin ;
+- alterne les côtés.
+`,
+
+  "Dead bug": `
+Allongé sur le dos, bras vers le plafond :
+
+- lève les jambes avec les genoux à environ 90° ;
+- garde le bas du dos en contact avec le sol ;
+- tends un bras et la jambe opposée ;
+- reviens au centre sans cambrer le dos ;
 - alterne les côtés.
 `,
 
@@ -377,6 +490,16 @@ Allongé sur le dos :
 - alterne les jambes de façon contrôlée.
 `,
 
+  "Bird dog": `
+À quatre pattes :
+
+- garde le dos dans une position neutre ;
+- tends un bras et la jambe opposée ;
+- évite de tourner le bassin ;
+- reviens au centre ;
+- alterne les côtés.
+`,
+
   "Bird dog lent": `
 À quatre pattes, à vitesse **très lente** :
 
@@ -397,6 +520,16 @@ Allongé sur le dos :
 - reviens lentement puis alterne.
 `,
 
+  Superman: `
+Allongé sur le ventre :
+
+- tends les bras devant toi et garde les jambes allongées ;
+- décolle légèrement les bras et les jambes ;
+- serre les fessiers et rapproche les omoplates ;
+- garde la nuque dans une position naturelle ;
+- repose-toi au sol entre les répétitions.
+`,
+
   "Wall sit": `
 Dos contre un mur :
 
@@ -415,22 +548,14 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       session: "S1 - Full body équilibre",
       circuit_repetitions: 2,
       exercises: [
-        {
-          name: "Pompes lentes",
-          reps: "10",
-          instruction: "Descente 3 secondes, courte pause en bas.",
-        },
-        { name: "Split squat hold", time: "30s/jambe" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        { name: "Glute bridge hold", time: "40s" },
+        { name: "Pompes", reps: "10" },
+        { name: "Fentes", reps: "10/jambe" },
+        { name: "W Hold au sol", time: "30s" },
+        { name: "Glute bridge", reps: "15" },
         { name: "Planche latérale", time: "25s/côté" },
       ],
       finisher: {
-        name: "Pompes lentes",
+        name: "Pompes",
         instruction: "Quasi-échec : garder 1-2 répétitions propres.",
         performance: { type: "repetitions", unit: "repetitions" },
       },
@@ -440,23 +565,11 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       session: "S2 - Bas du corps",
       circuit_repetitions: 2,
       exercises: [
-        {
-          name: "Squats lents",
-          reps: "15",
-          instruction: "Descente contrôlée en 3 secondes.",
-        },
-        { name: "Split squat hold", time: "30s/jambe" },
-        {
-          name: "Glute bridge",
-          reps: "18",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        {
-          name: "Montées de mollets lentes",
-          reps: "25",
-          instruction: "Marquer une courte pause en haut.",
-        },
-        { name: "Wall sit", time: "40s" },
+        { name: "Squats", reps: "14" },
+        { name: "Fentes", reps: "8/jambe" },
+        { name: "Glute bridge", reps: "15" },
+        { name: "Montées de mollets", reps: "20" },
+        { name: "Wall sit", time: "45s" },
       ],
       finisher: {
         name: "Wall sit",
@@ -469,31 +582,15 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       session: "S3 - Haut du corps",
       circuit_repetitions: 2,
       exercises: [
-        {
-          name: "Pompes serrées lentes",
-          reps: "8",
-          instruction: "Garder les coudes proches du corps.",
-        },
+        { name: "Pompes", reps: "10" },
         {
           name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
+          reps: "10",
+          instruction: "Mouvement naturel et contrôlé, sans tempo imposé.",
         },
-        {
-          name: "Pompes avec pause basse",
-          reps: "8",
-          instruction: "Pause de 2 secondes près du sol.",
-        },
-        {
-          name: "W Hold au sol",
-          time: "30s",
-          instruction: "Serrer les omoplates sans cambrer le bas du dos.",
-        },
-        {
-          name: "Planche shoulder taps très lents",
-          reps: "12 alternances",
-          instruction: "Bassin stable, aucun mouvement rapide.",
-        },
+        { name: "Pompes écartées", reps: "10" },
+        { name: "W Hold au sol", time: "30s" },
+        { name: "Planche shoulder taps", reps: "20 alternances" },
       ],
       finisher: {
         name: "Pompes",
@@ -508,17 +605,9 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       exercises: [
         { name: "Planche avant", time: "30s" },
         { name: "Planche latérale", time: "30s/côté" },
-        {
-          name: "Dead bug lent",
-          reps: "10/côté",
-          instruction: "Garder le bas du dos au sol.",
-        },
-        {
-          name: "Bird dog lent",
-          reps: "10/côté",
-          instruction: "Rester stable et contrôler chaque retour.",
-        },
-        { name: "Glute bridge hold", time: "40s" },
+        { name: "Dead bug", reps: "8/côté" },
+        { name: "Bird dog", reps: "8/côté" },
+        { name: "Glute bridge", reps: "15" },
       ],
       finisher: {
         name: "Planche avant",
@@ -531,25 +620,17 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       session: "S5 - Unilatéral",
       circuit_repetitions: 2,
       exercises: [
-        { name: "Squat une jambe assisté", reps: "8/jambe" },
-        {
-          name: "Fentes bulgares lentes",
-          reps: "10/jambe",
-          instruction: "Descente contrôlée en 3 secondes.",
-        },
-        { name: "Pompes lentes", reps: "10" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        { name: "Montées de mollets une jambe", reps: "15/jambe" },
+        { name: "Fentes", reps: "6/jambe" },
+        { name: "Fentes arrière", reps: "8/jambe" },
+        { name: "Pompes", reps: "8" },
+        { name: "Bird dog", reps: "8/côté" },
+        { name: "Montées de mollets", reps: "20" },
       ],
       finisher: {
-        name: "Split squat hold",
+        name: "Fentes",
         instruction:
-          "Chaque jambe à quasi-échec ; noter la durée de la jambe la plus faible.",
-        performance: { type: "duration", unit: "seconds" },
+          "Chaque jambe à quasi-échec ; noter les répétitions de la jambe la plus faible.",
+        performance: { type: "repetitions", unit: "repetitions" },
       },
     },
     {
@@ -557,22 +638,14 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       session: "S6 - Full body intense",
       circuit_repetitions: 3,
       exercises: [
-        { name: "Pompes", instruction: "Maximum moins 2 répétitions." },
-        {
-          name: "Squats lents",
-          reps: "18",
-          instruction: "Descente contrôlée en 3 secondes.",
-        },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        { name: "Glute bridge une jambe", reps: "10/jambe" },
+        { name: "Pompes", reps: "10" },
+        { name: "Squats", reps: "20" },
+        { name: "Superman", reps: "15" },
+        { name: "Glute bridge", reps: "10" },
         { name: "Planche avant", time: "30s" },
       ],
       finisher: {
-        name: "Pompes lentes",
+        name: "Pompes",
         instruction:
           "Quasi-échec ; test maximum optionnel seulement toutes les 1-2 semaines.",
         performance: { type: "repetitions", unit: "repetitions" },
@@ -590,15 +663,11 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       exercises: [
         {
           name: "Pompes lentes",
-          reps: "14",
+          reps: "12",
           instruction: "Descente 3 secondes, courte pause en bas.",
         },
         { name: "Split squat hold", time: "40s/jambe" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
+        { name: "W Hold au sol", time: "40s" },
         { name: "Glute bridge hold", time: "50s" },
         { name: "Planche latérale", time: "35s/côté" },
       ],
@@ -615,12 +684,12 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       exercises: [
         {
           name: "Squats lents",
-          reps: "20",
+          reps: "18",
           instruction: "Descente contrôlée en 3 secondes.",
         },
         { name: "Split squat hold", time: "40s/jambe" },
-        { name: "Glute bridge", reps: "22" },
-        { name: "Montées de mollets lentes", reps: "30" },
+        { name: "Glute bridge", reps: "20" },
+        { name: "Montées de mollets lentes", reps: "25" },
         { name: "Wall sit", time: "55s" },
       ],
       finisher: {
@@ -634,21 +703,21 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       session: "S3 - Haut du corps",
       circuit_repetitions: 2,
       exercises: [
-        { name: "Pompes serrées lentes", reps: "12" },
+        { name: "Pompes serrées lentes", reps: "10" },
         {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
+          name: "Reverse Snow Angels lents",
+          reps: "10",
+          instruction: "3 secondes vers les hanches et 3 secondes au retour.",
         },
         {
           name: "Pompes avec pause basse",
-          reps: "10",
+          reps: "8",
           instruction: "Pause de 2 secondes près du sol.",
         },
         { name: "W Hold au sol", time: "40s" },
         {
           name: "Planche shoulder taps très lents",
-          reps: "16 alternances",
+          reps: "14 alternances",
           instruction: "Bassin stable, aucun mouvement rapide.",
         },
       ],
@@ -665,8 +734,8 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       exercises: [
         { name: "Planche avant", time: "45s" },
         { name: "Planche latérale", time: "40s/côté" },
-        { name: "Dead bug lent", reps: "12/côté" },
-        { name: "Bird dog avec pause", reps: "12/côté" },
+        { name: "Dead bug lent", reps: "10/côté" },
+        { name: "Bird dog avec pause", reps: "10/côté" },
         { name: "Glute bridge hold", time: "55s" },
       ],
       finisher: {
@@ -680,15 +749,11 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       session: "S5 - Unilatéral",
       circuit_repetitions: 2,
       exercises: [
-        { name: "Squat une jambe assisté", reps: "10/jambe" },
-        { name: "Fentes bulgares lentes", reps: "14/jambe" },
-        { name: "Pompes lentes", reps: "15" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        { name: "Montées de mollets une jambe", reps: "20/jambe" },
+        { name: "Squat une jambe assisté", reps: "8/jambe" },
+        { name: "Fentes bulgares lentes", reps: "12/jambe" },
+        { name: "Pompes lentes", reps: "12" },
+        { name: "Bird dog avec pause", reps: "10/côté" },
+        { name: "Montées de mollets une jambe", reps: "16/jambe" },
       ],
       finisher: {
         name: "Split squat hold",
@@ -703,13 +768,9 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       circuit_repetitions: 3,
       exercises: [
         { name: "Pompes", instruction: "Maximum moins 2 répétitions." },
-        { name: "Squats lents", reps: "22" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        { name: "Glute bridge une jambe", reps: "14/jambe" },
+        { name: "Squats lents", reps: "20" },
+        { name: "Superman", reps: "12" },
+        { name: "Glute bridge une jambe", reps: "12/jambe" },
         { name: "Planche avant", time: "45s" },
       ],
       finisher: {
@@ -731,18 +792,14 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       exercises: [
         {
           name: "Pompes avec pause basse",
-          reps: "12",
+          reps: "10",
           instruction: "Descente 3 secondes, pause de 2 secondes en bas.",
         },
         { name: "Split squat hold", time: "50s/jambe" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
+        { name: "W Hold au sol", time: "50s" },
         {
           name: "Glute bridge une jambe avec pause",
-          reps: "12/jambe",
+          reps: "10/jambe",
           instruction: "Pause de 2 secondes en haut.",
         },
         { name: "Planche latérale avec jambe levée", time: "25s/côté" },
@@ -760,12 +817,12 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       exercises: [
         {
           name: "Squats lents avec pause",
-          reps: "18",
+          reps: "15",
           instruction: "Descente 3 secondes, pause de 2 secondes en bas.",
         },
-        { name: "Fentes bulgares lentes", reps: "12/jambe" },
-        { name: "Glute bridge une jambe", reps: "14/jambe" },
-        { name: "Montées de mollets une jambe", reps: "18/jambe" },
+        { name: "Fentes bulgares lentes", reps: "10/jambe" },
+        { name: "Glute bridge une jambe", reps: "12/jambe" },
+        { name: "Montées de mollets une jambe", reps: "15/jambe" },
         { name: "Wall sit", time: "60s" },
       ],
       finisher: {
@@ -781,21 +838,22 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       exercises: [
         {
           name: "Pompes archer assistées",
-          reps: "8/côté",
+          reps: "6/côté",
           instruction: "Décharger progressivement le bras d'assistance.",
         },
         {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
+          name: "Reverse Snow Angels avec pause",
+          reps: "10",
+          instruction:
+            "Tempo 3 secondes, avec 1 seconde de pause près des hanches.",
         },
         {
           name: "Pompes serrées avec pause basse",
-          reps: "10",
+          reps: "8",
           instruction: "Pause de 2 secondes près du sol.",
         },
         { name: "W Hold au sol", time: "50s" },
-        { name: "Planche shoulder taps très lents", reps: "20 alternances" },
+        { name: "Planche shoulder taps très lents", reps: "16 alternances" },
       ],
       finisher: {
         name: "Pompes",
@@ -810,8 +868,8 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       exercises: [
         { name: "Planche longue", time: "35s" },
         { name: "Planche latérale avec jambe levée", time: "25s/côté" },
-        { name: "Dead bug jambes tendues", reps: "10/côté" },
-        { name: "Bird dog avec pause", reps: "12/côté" },
+        { name: "Dead bug jambes tendues", reps: "8/côté" },
+        { name: "Bird dog avec pause", reps: "10/côté" },
         { name: "Glute bridge une jambe hold", time: "30s/jambe" },
       ],
       finisher: {
@@ -825,21 +883,17 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       session: "S5 - Unilatéral",
       circuit_repetitions: 2,
       exercises: [
-        { name: "Squat une jambe assisté", reps: "12/jambe" },
+        { name: "Squat une jambe assisté", reps: "10/jambe" },
         {
           name: "Fentes bulgares lentes avec pause",
-          reps: "12/jambe",
+          reps: "10/jambe",
           instruction: "Pause de 2 secondes en bas.",
         },
-        { name: "Pompes archer assistées", reps: "8/côté" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
+        { name: "Pompes archer assistées", reps: "6/côté" },
+        { name: "Bird dog avec pause", reps: "10/côté" },
         {
           name: "Montées de mollets une jambe avec pause",
-          reps: "18/jambe",
+          reps: "15/jambe",
         },
       ],
       finisher: {
@@ -858,13 +912,9 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
           name: "Pompes avec pause basse",
           instruction: "Maximum moins 2 répétitions.",
         },
-        { name: "Squats lents avec pause", reps: "18" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        { name: "Glute bridge une jambe avec pause", reps: "14/jambe" },
+        { name: "Squats lents avec pause", reps: "15" },
+        { name: "Superman", reps: "15" },
+        { name: "Glute bridge une jambe avec pause", reps: "12/jambe" },
         { name: "Planche longue", time: "35s" },
       ],
       finisher: {
@@ -886,16 +936,12 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       exercises: [
         {
           name: "Pompes archer",
-          reps: "8/côté",
+          reps: "6/côté",
           instruction: "Amplitude complète et descente contrôlée.",
         },
         { name: "Split squat hold", time: "60s/jambe" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        { name: "Glute bridge une jambe avec pause", reps: "16/jambe" },
+        { name: "W Hold au sol", time: "60s" },
+        { name: "Glute bridge une jambe avec pause", reps: "14/jambe" },
         { name: "Planche latérale avec jambe levée", time: "35s/côté" },
       ],
       finisher: {
@@ -909,16 +955,16 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       session: "S2 - Bas du corps",
       circuit_repetitions: 2,
       exercises: [
-        { name: "Squat une jambe assisté", reps: "12/jambe" },
+        { name: "Squat une jambe assisté", reps: "10/jambe" },
         {
           name: "Fentes bulgares lentes avec pause",
-          reps: "14/jambe",
+          reps: "12/jambe",
           instruction: "Descente 3 secondes, pause de 2 secondes en bas.",
         },
-        { name: "Glute bridge une jambe avec pause", reps: "18/jambe" },
+        { name: "Glute bridge une jambe avec pause", reps: "15/jambe" },
         {
           name: "Montées de mollets une jambe avec pause",
-          reps: "20/jambe",
+          reps: "18/jambe",
         },
         {
           name: "Wall sit",
@@ -937,19 +983,20 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       session: "S3 - Haut du corps",
       circuit_repetitions: 2,
       exercises: [
-        { name: "Pompes archer", reps: "8/côté" },
+        { name: "Pompes archer", reps: "6/côté" },
         {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
+          name: "Reverse Snow Angels en tension continue",
+          reps: "10",
+          instruction:
+            "Tempo 3 secondes, pause de 2 secondes, sans reposer les bras.",
         },
         {
           name: "Pompes serrées avec pause basse",
-          reps: "12",
+          reps: "10",
           instruction: "Descente lente et pause de 2 secondes en bas.",
         },
         { name: "W Hold au sol", time: "60s" },
-        { name: "Planche shoulder taps très lents", reps: "24 alternances" },
+        { name: "Planche shoulder taps très lents", reps: "20 alternances" },
       ],
       finisher: {
         name: "Pompes",
@@ -964,8 +1011,8 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       exercises: [
         { name: "Planche longue", time: "45s" },
         { name: "Planche latérale avec jambe levée", time: "35s/côté" },
-        { name: "Dead bug jambes tendues", reps: "12/côté" },
-        { name: "Bird dog avec pause", reps: "14/côté" },
+        { name: "Dead bug jambes tendues", reps: "10/côté" },
+        { name: "Bird dog avec pause", reps: "12/côté" },
         { name: "Glute bridge une jambe hold", time: "40s/jambe" },
       ],
       finisher: {
@@ -981,19 +1028,15 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       exercises: [
         {
           name: "Squat une jambe assisté",
-          reps: "14/jambe",
+          reps: "12/jambe",
           instruction: "Utiliser le moins d'assistance possible.",
         },
-        { name: "Fentes bulgares lentes avec pause", reps: "14/jambe" },
-        { name: "Pompes archer", reps: "8/côté" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
+        { name: "Fentes bulgares lentes avec pause", reps: "12/jambe" },
+        { name: "Pompes archer", reps: "6/côté" },
+        { name: "Bird dog avec pause", reps: "12/côté" },
         {
           name: "Montées de mollets une jambe avec pause",
-          reps: "22/jambe",
+          reps: "20/jambe",
         },
       ],
       finisher: {
@@ -1012,13 +1055,9 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
           name: "Pompes archer",
           instruction: "Maximum moins 2 répétitions par côté.",
         },
-        { name: "Squat une jambe assisté", reps: "12/jambe" },
-        {
-          name: "Reverse Snow Angels",
-          reps: "12",
-          instruction: "Répétitions lentes et contrôlées.",
-        },
-        { name: "Glute bridge une jambe avec pause", reps: "18/jambe" },
+        { name: "Squat une jambe assisté", reps: "10/jambe" },
+        { name: "Superman", reps: "18" },
+        { name: "Glute bridge une jambe avec pause", reps: "15/jambe" },
         { name: "Planche longue", time: "45s" },
       ],
       finisher: {
