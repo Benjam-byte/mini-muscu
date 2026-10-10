@@ -12,10 +12,12 @@ import {
   WORKOUT_LEVEL_EMOJI_BY_LEVEL,
   WORKOUT_LEVEL_LIST,
   getCurrentWorkoutLevel,
+  getLatestFinisherResult,
   getWorkoutHistoryItem,
   isWorkoutCompleted,
   shouldSuggestLevelUp,
   type DifficultyRating,
+  type FinisherResult,
   type WorkoutHistoryItem,
   type WorkoutLevel,
 } from "../workoutHistory";
@@ -30,12 +32,14 @@ type Screen = "home" | "workout" | "complete" | "history";
 const REST_DURATION = 30;
 const WORKOUT_DAY_START_HOUR = 6;
 const SELECTED_WORKOUT_PLAN_KEY = "selected_workout_plan";
+const VIEWED_EXERCISE_HELP_NAME_LIST_KEY =
+  "viewed_exercise_help_name_list";
 const LEVEL_UP_SUGGESTION_DISMISSAL_DURATION = 7 * 24 * 60 * 60 * 1000;
 const STREAK_PROTECTION_KEY = "streak_protection";
 const MAX_STREAK_JOKER_COUNT = 4;
 const STREAK_JOKER_REGENERATION_DURATION = 7 * 24 * 60 * 60 * 1000;
 const MISSED_DAY_RESTORE_TAP_COUNT = 4;
-const MISSED_DAY_RESTORE_TAP_DELAY = 900;
+const MISSED_DAY_RESTORE_TAP_DELAY = 900; // ms
 
 const WORKOUT_PLAN_BY_LEVEL: Record<WorkoutLevel, typeof WORKOUT_PLAN> = {
   base: WORKOUT_PLAN,
@@ -55,6 +59,71 @@ const DIFFICULTY_OPTION_LIST: {
   { rating: 5, label: "Trop difficile" },
 ];
 
+const formatDuration = (totalSeconds: number): string => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
+const formatFinisherResult = (finisherResult: FinisherResult): string => {
+  if (finisherResult.type === "duration") {
+    return formatDuration(finisherResult.value);
+  }
+
+  const unitLabel =
+    finisherResult.unit === "tours"
+      ? finisherResult.value === 1
+        ? "tour"
+        : "tours"
+      : finisherResult.value === 1
+        ? "répétition"
+        : "répétitions";
+
+  return `${finisherResult.value} ${unitLabel}`;
+};
+
+const getSavedViewedExerciseHelpNameSet = (): Set<string> => {
+  try {
+    const savedExerciseNameList = localStorage.getItem(
+      VIEWED_EXERCISE_HELP_NAME_LIST_KEY,
+    );
+
+    if (!savedExerciseNameList) {
+      return new Set();
+    }
+
+    const parsedExerciseNameList = JSON.parse(savedExerciseNameList) as unknown;
+
+    if (!Array.isArray(parsedExerciseNameList)) {
+      return new Set();
+    }
+
+    return new Set(
+      parsedExerciseNameList.filter(
+        (exerciseName): exerciseName is string =>
+          typeof exerciseName === "string",
+      ),
+    );
+  } catch (error) {
+    console.error("Unable to parse viewed exercise help list", error);
+    return new Set();
+  }
+};
+
+const saveViewedExerciseHelpNameSet = (
+  viewedExerciseHelpNameSet: Set<string>,
+): void => {
+  try {
+    localStorage.setItem(
+      VIEWED_EXERCISE_HELP_NAME_LIST_KEY,
+      JSON.stringify([...viewedExerciseHelpNameSet]),
+    );
+  } catch (error) {
+    console.error("Unable to save viewed exercise help list", error);
+  }
+};
+
 type StreakProtectionState = {
   jokerCount: number;
   lastRegeneratedAt: string;
@@ -68,12 +137,6 @@ type StreakAnalysis = {
   bestStreakRunList: StreakRunSummary[];
 };
 
-type MissedDayRestoreTapState = {
-  dateKey: string;
-  count: number;
-  lastTappedAt: number;
-};
-
 export default function Welcome() {
   const [screen, setScreen] = useState<Screen>("home");
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -83,7 +146,17 @@ export default function Welcome() {
   const [isResting, setIsResting] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [finisherRepetitionInput, setFinisherRepetitionInput] = useState("");
+  const [finisherElapsedSeconds, setFinisherElapsedSeconds] = useState(0);
+  const [finisherTimerStartedAt, setFinisherTimerStartedAt] = useState<
+    number | null
+  >(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [missedDayRestoreTapState, setMissedDayRestoreTapState] = useState<{
+    dateKey: string;
+    count: number;
+    lastTappedAt: number;
+  }>({ dateKey: "", count: 0, lastTappedAt: 0 });
   const [selectedDifficultyRating, setSelectedDifficultyRating] =
     useState<DifficultyRating | null>(null);
   const [shouldShowLevelUpSuggestion, setShouldShowLevelUpSuggestion] =
@@ -94,14 +167,15 @@ export default function Welcome() {
   const [selectedExerciseName, setSelectedExerciseName] = useState<
     string | null
   >(null);
+  const [viewedExerciseHelpNameSet, setViewedExerciseHelpNameSet] = useState<
+    Set<string>
+  >(getSavedViewedExerciseHelpNameSet);
   const [isJokerPopoverOpen, setIsJokerPopoverOpen] = useState(false);
-  const [missedDayRestoreTapState, setMissedDayRestoreTapState] =
-    useState<MissedDayRestoreTapState>({
-      dateKey: "",
-      count: 0,
-      lastTappedAt: 0,
-    });
-  const [, setHistoryRevision] = useState(0);
+  const [isJokerModalOpen, setIsJokerModalOpen] = useState(false);
+  const [jokerCalendarMonth, setJokerCalendarMonth] = useState(new Date());
+  const [selectedJokerDateKey, setSelectedJokerDateKey] = useState<
+    string | null
+  >(null);
 
   function getSavedStreakProtectionState(): StreakProtectionState {
     const savedStreakProtectionState = localStorage.getItem(
@@ -153,11 +227,28 @@ export default function Welcome() {
     useState<StreakProtectionState>(getSavedStreakProtectionState);
 
   const openExerciseIllustration = (exerciseName: string) => {
+    setViewedExerciseHelpNameSet((currentExerciseNameSet) => {
+      if (currentExerciseNameSet.has(exerciseName)) {
+        return currentExerciseNameSet;
+      }
+
+      const nextExerciseNameSet = new Set(currentExerciseNameSet);
+      nextExerciseNameSet.add(exerciseName);
+      saveViewedExerciseHelpNameSet(nextExerciseNameSet);
+
+      return nextExerciseNameSet;
+    });
     setSelectedExerciseName(exerciseName);
   };
 
   const closeExerciseIllustration = () => {
     setSelectedExerciseName(null);
+  };
+
+  const resetFinisherPerformance = () => {
+    setFinisherRepetitionInput("");
+    setFinisherElapsedSeconds(0);
+    setFinisherTimerStartedAt(null);
   };
 
   function getWorkoutDayDate(date = new Date()) {
@@ -276,30 +367,6 @@ export default function Welcome() {
       ),
       lastRegeneratedAt: workoutDayDate.toISOString(),
     };
-  }
-
-  function hasCompletedOrProtectedWorkoutBefore(
-    date: Date,
-    protectionState: StreakProtectionState,
-  ) {
-    const dateKeySet = new Set(
-      getCompletedOrProtectedDateKeyList(protectionState),
-    );
-    const dateToCheck = new Date(date);
-
-    for (let checkedDayCount = 0; checkedDayCount < 366; checkedDayCount++) {
-      dateToCheck.setDate(dateToCheck.getDate() - 1);
-
-      if (!hasWorkoutPlanned(dateToCheck)) {
-        continue;
-      }
-
-      if (dateKeySet.has(getWorkoutDoneKey(dateToCheck))) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   function getBestStreakRunList(
@@ -427,21 +494,7 @@ export default function Welcome() {
         continue;
       }
 
-      if (
-        protectionState.jokerCount <= 0 ||
-        !hasCompletedOrProtectedWorkoutBefore(dateToCheck, protectionState)
-      ) {
-        break;
-      }
-
-      protectedDateKeySet.add(dateKey);
-      protectionState = {
-        ...protectionState,
-        jokerCount: protectionState.jokerCount - 1,
-        protectedDateKeyList: [...protectedDateKeySet].sort(),
-      };
-      streak += 1;
-      dateToCheck.setDate(dateToCheck.getDate() - 1);
+      break;
     }
 
     const bestStreakRunList = getBestStreakRunList(
@@ -476,6 +529,7 @@ export default function Welcome() {
     setIsResting(false);
     setTimerSeconds(0);
     setTimerRunning(false);
+    resetFinisherPerformance();
   };
 
   const today = new Date();
@@ -496,6 +550,44 @@ export default function Welcome() {
     (workout) => workout.day === todayName,
   );
   const isRestDay = todayName === "Thursday";
+
+  const getCurrentFinisherResult = (): FinisherResult | null => {
+    if (!todayWorkout) {
+      return null;
+    }
+
+    const { name, performance } = todayWorkout.finisher;
+
+    if (performance.type === "duration") {
+      if (finisherTimerStartedAt !== null || finisherElapsedSeconds < 1) {
+        return null;
+      }
+
+      return {
+        exerciseName: name,
+        type: "duration",
+        unit: "seconds",
+        value: finisherElapsedSeconds,
+      };
+    }
+
+    if (!/^[1-9]\d*$/.test(finisherRepetitionInput)) {
+      return null;
+    }
+
+    const repetitionCount = Number(finisherRepetitionInput);
+
+    if (!Number.isSafeInteger(repetitionCount)) {
+      return null;
+    }
+
+    return {
+      exerciseName: name,
+      type: "repetitions",
+      unit: performance.unit,
+      value: repetitionCount,
+    };
+  };
 
   const streakAnalysis = getStreakAnalysis(
     workoutDayDate,
@@ -664,6 +756,23 @@ export default function Welcome() {
     return () => clearInterval(interval);
   }, [timerRunning, timerSeconds]);
 
+  useEffect(() => {
+    if (finisherTimerStartedAt === null) {
+      return;
+    }
+
+    const updateElapsedSeconds = () => {
+      setFinisherElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - finisherTimerStartedAt) / 1000)),
+      );
+    };
+
+    updateElapsedSeconds();
+    const interval = window.setInterval(updateElapsedSeconds, 250);
+
+    return () => window.clearInterval(interval);
+  }, [finisherTimerStartedAt]);
+
   const startWorkout = () => {
     setScreen("workout");
     setCurrentExerciseIndex(0);
@@ -672,6 +781,7 @@ export default function Welcome() {
     setIsResting(false);
     setTimerSeconds(0);
     setTimerRunning(false);
+    resetFinisherPerformance();
   };
 
   useEffect(() => {
@@ -691,6 +801,10 @@ export default function Welcome() {
     if (!todayWorkout) return;
 
     if (isFinisher) {
+      if (!getCurrentFinisherResult()) {
+        return;
+      }
+
       setScreen("complete");
       return;
     }
@@ -709,6 +823,7 @@ export default function Welcome() {
         setIsFinisher(true);
         setTimerSeconds(0);
         setTimerRunning(false);
+        resetFinisherPerformance();
       }
     }
   };
@@ -726,8 +841,32 @@ export default function Welcome() {
     setTimerRunning(true);
   };
 
+  const startFinisherTimer = () => {
+    setFinisherTimerStartedAt(
+      Date.now() - finisherElapsedSeconds * 1000,
+    );
+  };
+
+  const stopFinisherTimer = () => {
+    if (finisherTimerStartedAt === null) {
+      return;
+    }
+
+    setFinisherElapsedSeconds(
+      Math.max(0, Math.floor((Date.now() - finisherTimerStartedAt) / 1000)),
+    );
+    setFinisherTimerStartedAt(null);
+  };
+
   const validateWorkout = () => {
     if (!selectedDifficultyRating || !todayWorkout) {
+      return;
+    }
+
+    const finisherResult = getCurrentFinisherResult();
+
+    if (!finisherResult) {
+      setScreen("workout");
       return;
     }
 
@@ -738,12 +877,14 @@ export default function Welcome() {
       difficultyRating: selectedDifficultyRating,
       session: todayWorkout.session,
       completedAt: new Date().toISOString(),
+      finisherResult,
     };
 
     localStorage.setItem(todayKey, JSON.stringify(workoutHistoryItem));
     setIsCompleted(true);
     setScreen("home");
     setSelectedDifficultyRating(null);
+    resetFinisherPerformance();
   };
 
   const increaseWorkoutLevel = (): void => {
@@ -823,10 +964,7 @@ export default function Welcome() {
     const plannedWorkout = selectedWorkoutPlan.weekly_plan.find(
       (workout) => workout.day === dayName,
     );
-
-    if (!plannedWorkout) {
-      return;
-    }
+    if (!plannedWorkout) return;
 
     const dateKey = getWorkoutDoneKey(date);
     const completedAt = new Date(
@@ -848,22 +986,12 @@ export default function Welcome() {
     };
 
     localStorage.setItem(dateKey, JSON.stringify(workoutHistoryItem));
-    setMissedDayRestoreTapState({
-      dateKey: "",
-      count: 0,
-      lastTappedAt: 0,
-    });
-    setHistoryRevision((revision) => revision + 1);
-
-    if (dateKey === todayKey) {
-      setIsCompleted(true);
-    }
+    setMissedDayRestoreTapState({ dateKey: "", count: 0, lastTappedAt: 0 });
+    if (dateKey === todayKey) setIsCompleted(true);
   };
 
   const handleHistoryDayTap = (date: Date, status: string) => {
-    if (status !== "missed") {
-      return;
-    }
+    if (status !== "missed") return;
 
     const dateKey = getWorkoutDoneKey(date);
     const now = Date.now();
@@ -880,11 +1008,76 @@ export default function Welcome() {
       return;
     }
 
-    setMissedDayRestoreTapState({
-      dateKey,
-      count: nextTapCount,
-      lastTappedAt: now,
+    setMissedDayRestoreTapState({ dateKey, count: nextTapCount, lastTappedAt: now });
+  };
+
+  const openJokerModal = () => {
+    setJokerCalendarMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1),
+    );
+    setSelectedJokerDateKey(null);
+    setIsJokerModalOpen(true);
+  };
+
+  const closeJokerModal = () => {
+    setSelectedJokerDateKey(null);
+    setIsJokerModalOpen(false);
+  };
+
+  const changeJokerCalendarMonth = (monthOffset: number) => {
+    setJokerCalendarMonth(
+      new Date(
+        jokerCalendarMonth.getFullYear(),
+        jokerCalendarMonth.getMonth() + monthOffset,
+        1,
+      ),
+    );
+    setSelectedJokerDateKey(null);
+  };
+
+  const getJokerPreviewAnalysis = (
+    dateKey: string | null,
+  ): StreakAnalysis | null => {
+    if (
+      !dateKey ||
+      streakAnalysis.protectionState.jokerCount <= 0
+    ) {
+      return null;
+    }
+
+    const selectedDate = getDateFromWorkoutDoneKey(dateKey);
+
+    if (!selectedDate || getWorkoutStatus(selectedDate) !== "missed") {
+      return null;
+    }
+
+    const protectedDateKeyList = [
+      ...new Set([
+        ...streakAnalysis.protectionState.protectedDateKeyList,
+        dateKey,
+      ]),
+    ].sort();
+
+    return getStreakAnalysis(workoutDayDate, {
+      ...streakAnalysis.protectionState,
+      jokerCount: streakAnalysis.protectionState.jokerCount - 1,
+      protectedDateKeyList,
     });
+  };
+
+  const applySelectedJoker = () => {
+    const previewAnalysis = getJokerPreviewAnalysis(selectedJokerDateKey);
+
+    if (!previewAnalysis) {
+      return;
+    }
+
+    localStorage.setItem(
+      STREAK_PROTECTION_KEY,
+      JSON.stringify(previewAnalysis.protectionState),
+    );
+    setStreakProtectionState(previewAnalysis.protectionState);
+    closeJokerModal();
   };
 
   const previousMonth = () => {
@@ -921,11 +1114,25 @@ export default function Welcome() {
 
   if (screen === "history") {
     const days = getDaysInMonth(currentMonth);
+    const jokerCalendarDays = getDaysInMonth(jokerCalendarMonth);
     const monthStats = getMonthStats(currentMonth);
     const monthName = currentMonth.toLocaleDateString("fr-FR", {
       month: "long",
       year: "numeric",
     });
+    const jokerCalendarMonthName = jokerCalendarMonth.toLocaleDateString(
+      "fr-FR",
+      {
+        month: "long",
+        year: "numeric",
+      },
+    );
+    const jokerPreviewAnalysis = getJokerPreviewAnalysis(
+      selectedJokerDateKey,
+    );
+    const selectedJokerDate = selectedJokerDateKey
+      ? getDateFromWorkoutDoneKey(selectedJokerDateKey)
+      : null;
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
@@ -945,6 +1152,23 @@ export default function Welcome() {
               →
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={openJokerModal}
+            className="mb-6 flex w-full items-center justify-between rounded-2xl bg-amber-100 px-5 py-4 text-left text-amber-900 transition-colors hover:bg-amber-200"
+          >
+            <span>
+              <span className="block text-base">Utiliser un joker</span>
+              <span className="mt-0.5 block text-xs text-amber-700">
+                Choisir manuellement un jour oublié
+              </span>
+            </span>
+            <span className="rounded-full bg-white/70 px-3 py-1 text-sm">
+              🃏 {streakAnalysis.protectionState.jokerCount}/
+              {MAX_STREAK_JOKER_COUNT}
+            </span>
+          </button>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="grid grid-cols-7 gap-2 mb-4">
@@ -997,11 +1221,7 @@ export default function Welcome() {
                   <div
                     key={idx}
                     onClick={() => handleHistoryDayTap(day, status)}
-                    className={`aspect-square flex flex-col items-center justify-center rounded-lg ${bgColor} ${textColor} ${borderColor} text-sm ${
-                      status === "missed"
-                        ? "cursor-pointer transition-transform active:scale-95"
-                        : ""
-                    }`}
+                    className={`aspect-square flex flex-col items-center justify-center rounded-lg ${bgColor} ${textColor} ${borderColor} text-sm ${status === "missed" ? "cursor-pointer" : ""}`}
                   >
                     <span>{day.getDate()}</span>
                     {status === "protected" && (
@@ -1077,6 +1297,191 @@ export default function Welcome() {
             </button>
           </div>
         </div>
+
+        {isJokerModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 p-4 sm:items-center">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="joker-modal-title"
+              className="mx-auto max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs text-amber-700">
+                    🃏 {streakAnalysis.protectionState.jokerCount} disponible
+                    {streakAnalysis.protectionState.jokerCount !== 1 ? "s" : ""}
+                  </p>
+                  <h2
+                    id="joker-modal-title"
+                    className="mt-1 text-2xl text-slate-900"
+                  >
+                    Utiliser un joker
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeJokerModal}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  aria-label="Fermer"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+                <p>
+                  Un joker protège un entraînement oublié et peut reconnecter
+                  ta streak.
+                </p>
+                <p className="mt-2 text-xs text-amber-700">
+                  Le jour compte dans la streak, mais reste distinct d’une
+                  séance réellement terminée dans tes statistiques.
+                </p>
+              </div>
+
+              {streakAnalysis.protectionState.jokerCount === 0 ? (
+                <p className="mt-5 rounded-2xl border border-slate-200 p-4 text-sm text-slate-600">
+                  Aucun joker disponible pour le moment. Tu en récupères un
+                  tous les 7 jours, avec un maximum de{" "}
+                  {MAX_STREAK_JOKER_COUNT}.
+                </p>
+              ) : (
+                <>
+                  <p className="mt-5 text-sm text-slate-600">
+                    Sélectionne un jour d’entraînement oublié :
+                  </p>
+
+                  <div className="mt-3 rounded-2xl border border-slate-200 p-4">
+                    <div className="mb-4 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => changeJokerCalendarMonth(-1)}
+                        className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+                        aria-label="Mois précédent"
+                      >
+                        ←
+                      </button>
+                      <h3 className="capitalize text-slate-800">
+                        {jokerCalendarMonthName}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => changeJokerCalendarMonth(1)}
+                        className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+                        aria-label="Mois suivant"
+                      >
+                        →
+                      </button>
+                    </div>
+
+                    <div className="mb-2 grid grid-cols-7 gap-2">
+                      {["L", "M", "M", "J", "V", "S", "D"].map(
+                        (dayLabel, index) => (
+                          <div
+                            key={index}
+                            className="py-1 text-center text-[10px] text-slate-400"
+                          >
+                            {dayLabel}
+                          </div>
+                        ),
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2">
+                      {jokerCalendarDays.map((day, index) => {
+                        if (!day) {
+                          return (
+                            <div key={index} className="aspect-square" />
+                          );
+                        }
+
+                        const dateKey = getWorkoutDoneKey(day);
+                        const status = getWorkoutStatus(day);
+                        const isEligible = status === "missed";
+                        const isSelected =
+                          selectedJokerDateKey === dateKey;
+
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            disabled={!isEligible}
+                            onClick={() => setSelectedJokerDateKey(dateKey)}
+                            className={
+                              isSelected
+                                ? "aspect-square rounded-lg bg-amber-500 text-sm text-white ring-2 ring-amber-700 ring-offset-2"
+                                : isEligible
+                                  ? "aspect-square rounded-lg bg-red-100 text-sm text-red-700 transition-colors hover:bg-amber-100 hover:text-amber-800"
+                                  : status === "protected"
+                                    ? "aspect-square rounded-lg bg-amber-100 text-sm text-amber-700"
+                                    : status === "done"
+                                      ? "aspect-square rounded-lg bg-green-50 text-sm text-green-600"
+                                      : "aspect-square rounded-lg bg-slate-50 text-sm text-slate-300"
+                            }
+                          >
+                            <span className="block">{day.getDate()}</span>
+                            {status === "protected" && (
+                              <span className="block text-[9px]">🃏</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="mt-4 text-xs text-slate-500">
+                      Les jours rouges sont les jours éligibles.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {selectedJokerDate && jokerPreviewAnalysis && (
+                <div
+                  className={`mt-4 rounded-2xl p-4 text-sm ${
+                    jokerPreviewAnalysis.streak > currentStreak
+                      ? "bg-green-50 text-green-900"
+                      : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  <p className="font-medium">
+                    {selectedJokerDate.toLocaleDateString("fr-FR", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <p className="mt-2 leading-relaxed">
+                    {jokerPreviewAnalysis.streak > currentStreak
+                      ? currentStreak === 0
+                        ? `Ce joker redémarrera ta streak à ${jokerPreviewAnalysis.streak} jour${jokerPreviewAnalysis.streak > 1 ? "s" : ""}.`
+                        : `Ta streak passera de ${currentStreak} à ${jokerPreviewAnalysis.streak} jours.`
+                      : "Ce joker ne redémarrera pas ta streak actuelle : un autre jour oublié la sépare encore de tes séances récentes."}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeJokerModal}
+                  className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-slate-700 hover:bg-slate-200"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={applySelectedJoker}
+                  disabled={!jokerPreviewAnalysis}
+                  className="flex-1 rounded-xl bg-amber-500 px-4 py-3 text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  Valider
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1110,11 +1515,15 @@ export default function Welcome() {
               {isJokerPopoverOpen && (
                 <div className="absolute right-0 top-10 z-20 w-60 rounded-xl border border-amber-100 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
                   <p className="text-amber-800">
-                    Un joker protege une seance prevue oubliee.
+                    Un joker protège une séance prévue oubliée.
                   </p>
                   <p className="mt-1">
-                    Tu en recuperes 1 tous les 7 jours, jusqu'a{" "}
+                    Tu en récupères 1 tous les 7 jours, jusqu'à{" "}
                     {MAX_STREAK_JOKER_COUNT} en stock.
+                  </p>
+                  <p className="mt-1">
+                    Ils ne sont jamais utilisés automatiquement : active-les
+                    depuis l’historique.
                   </p>
                 </div>
               )}
@@ -1203,6 +1612,7 @@ export default function Welcome() {
                       <div className="flex items-center gap-2">
                         <ExercisePreviewButton
                           exerciseName={ex.name}
+                          hasUnseenHelp={!viewedExerciseHelpNameSet.has(ex.name)}
                           onClick={openExerciseIllustration}
                         />
                         <span className="text-slate-700">{ex.name}</span>
@@ -1309,6 +1719,20 @@ export default function Welcome() {
     const currentExercise = getCurrentExercise();
     if (!currentExercise) return null;
 
+    const hasUnseenCurrentExerciseHelp = !viewedExerciseHelpNameSet.has(
+      currentExercise.name,
+    );
+
+    const currentFinisherResult = isFinisher
+      ? getCurrentFinisherResult()
+      : null;
+    const latestFinisherResult = isFinisher
+      ? getLatestFinisherResult(
+          todayWorkout.finisher.name,
+          todayWorkout.finisher.performance.type,
+        )
+      : null;
+
     return (
       <>
         <div className="min-h-screen bg-gradient-to-b from-slate-800 to-slate-900 p-4 flex flex-col">
@@ -1339,10 +1763,16 @@ export default function Welcome() {
                     onClick={() =>
                       openExerciseIllustration(currentExercise.name)
                     }
-                    aria-label={`Voir l'exercice ${currentExercise.name}`}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    aria-label={`Voir l'exercice ${currentExercise.name}${hasUnseenCurrentExerciseHelp ? ", aide non consultée" : ""}`}
+                    className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                   >
                     <EyeIcon />
+                    {hasUnseenCurrentExerciseHelp && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white"
+                      />
+                    )}
                   </button>
                 </div>
 
@@ -1360,6 +1790,84 @@ export default function Welcome() {
                       </div>
                     )}
 
+                  {isFinisher && latestFinisherResult && (
+                    <div className="mb-6 rounded-xl bg-white/10 px-4 py-3 text-slate-200">
+                      Dernière fois :{" "}
+                      <span className="font-semibold text-white">
+                        {formatFinisherResult(latestFinisherResult)}
+                      </span>
+                    </div>
+                  )}
+
+                  {isFinisher &&
+                    todayWorkout.finisher.performance.type ===
+                      "repetitions" && (
+                      <div className="mx-auto max-w-xs space-y-3">
+                        <label
+                          htmlFor="finisher-repetitions"
+                          className="block text-sm text-slate-300"
+                        >
+                          Nombre de{" "}
+                          {todayWorkout.finisher.performance.unit === "tours"
+                            ? "tours complets"
+                            : "répétitions réussies"}
+                        </label>
+                        <input
+                          id="finisher-repetitions"
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          step="1"
+                          value={finisherRepetitionInput}
+                          onChange={(event) =>
+                            setFinisherRepetitionInput(event.target.value)
+                          }
+                          placeholder="0"
+                          className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-4 text-center text-4xl text-white outline-none placeholder:text-slate-500 focus:border-white/50"
+                        />
+                      </div>
+                    )}
+
+                  {isFinisher &&
+                    todayWorkout.finisher.performance.type === "duration" && (
+                      <div className="space-y-5">
+                        <div className="font-mono text-7xl tabular-nums text-white">
+                          {formatDuration(finisherElapsedSeconds)}
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          {finisherTimerStartedAt === null ? (
+                            <button
+                              type="button"
+                              onClick={startFinisherTimer}
+                              className="rounded-xl bg-green-500 px-6 py-3 text-white transition-colors hover:bg-green-600"
+                            >
+                              {finisherElapsedSeconds === 0
+                                ? "Démarrer"
+                                : "Reprendre"}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={stopFinisherTimer}
+                              className="rounded-xl bg-red-500 px-6 py-3 text-white transition-colors hover:bg-red-600"
+                            >
+                              Arrêter
+                            </button>
+                          )}
+                          {(finisherElapsedSeconds > 0 ||
+                            finisherTimerStartedAt !== null) && (
+                            <button
+                              type="button"
+                              onClick={resetFinisherPerformance}
+                              className="rounded-xl bg-white/20 px-6 py-3 text-white transition-colors hover:bg-white/30"
+                            >
+                              Recommencer
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                   {"time" in currentExercise && currentExercise.time && (
                     <div className="space-y-4">
                       {timerSeconds > 0 ? (
@@ -1374,7 +1882,7 @@ export default function Welcome() {
 
                       {!timerRunning && timerSeconds === 0 && (
                         <button
-                          onClick={() => startTimer(currentExercise.time)}
+                          onClick={() => startTimer(currentExercise.time!)}
                           className="bg-white/20 text-white px-8 py-3 rounded-xl hover:bg-white/30 transition-colors"
                         >
                           Démarrer le timer
@@ -1387,9 +1895,10 @@ export default function Welcome() {
 
               <button
                 onClick={handleNext}
-                className="w-full bg-white text-slate-900 py-5 rounded-2xl text-xl hover:bg-slate-100 transition-colors"
+                disabled={isFinisher && currentFinisherResult === null}
+                className="w-full bg-white text-slate-900 py-5 rounded-2xl text-xl hover:bg-slate-100 transition-colors disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
               >
-                Suivant
+                {isFinisher ? "Terminer le finisher" : "Suivant"}
               </button>
             </div>
           </div>

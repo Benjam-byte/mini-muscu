@@ -1,20 +1,30 @@
 type ExercisePreviewButtonProps = {
   exerciseName: string;
+  hasUnseenHelp: boolean;
   onClick: (exerciseName: string) => void;
 };
 
 export function ExercisePreviewButton({
   exerciseName,
+  hasUnseenHelp,
   onClick,
 }: ExercisePreviewButtonProps) {
+  const ariaLabel = `Voir l'exercice ${exerciseName}${hasUnseenHelp ? ", aide non consultée" : ""}`;
+
   return (
     <button
       type="button"
       onClick={() => onClick(exerciseName)}
-      aria-label={`Voir l'exercice ${exerciseName}`}
-      className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800"
+      aria-label={ariaLabel}
+      className="relative flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800"
     >
       <EyeIcon />
+      {hasUnseenHelp && (
+        <span
+          aria-hidden="true"
+          className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white"
+        />
+      )}
     </button>
   );
 }
