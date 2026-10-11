@@ -477,7 +477,7 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       circuit_repetitions: 1,
       exercises: [
         { name: "Planche latérale", time: "20s/côté" },
-        { name: "Squats", reps: "20" },
+        { name: "Squats", reps: "10" },
         { name: "Montées de mollets", reps: "20" },
         { name: "Rameur", reps: "20" },
       ],
@@ -602,11 +602,11 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
     {
       day: "Sunday",
       session: "420",
-      circuit_repetitions: 1,
+      circuit_repetitions: 2,
       exercises: [
-        { name: "Planche latérale", time: "20s/côté" },
+        { name: "Planche latérale", time: "25s/côté" },
         { name: "Squats", reps: "20" },
-        { name: "Montées de mollets", reps: "20" },
+        { name: "Montées de mollets", reps: "30" },
         {
           name: "Rameur",
           reps: "20",
@@ -745,11 +745,11 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
     {
       day: "Sunday",
       session: "420",
-      circuit_repetitions: 1,
+      circuit_repetitions: 2,
       exercises: [
-        { name: "Planche latérale", time: "20s/côté" },
-        { name: "Squats", reps: "20" },
-        { name: "Montées de mollets", reps: "20" },
+        { name: "Planche latérale avec jambe levée", time: "15s/côté" },
+        { name: "Squats lents", reps: "15" },
+        { name: "Montées de mollets une jambe", reps: "10/jambe" },
         {
           name: "Rameur",
           reps: "20",
@@ -895,14 +895,14 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
     {
       day: "Sunday",
       session: "420",
-      circuit_repetitions: 1,
+      circuit_repetitions: 2,
       exercises: [
-        { name: "Planche latérale", time: "20s/côté" },
-        { name: "Squats", reps: "20" },
-        { name: "Montées de mollets", reps: "20" },
+        { name: "Planche latérale avec jambe levée", time: "20s/côté" },
+        { name: "Squats lents avec pause", reps: "15" },
+        { name: "Montées de mollets une jambe", reps: "12/jambe" },
         {
           name: "Rameur",
-          reps: "20",
+          reps: "24",
           instruction:
             "Récupération active : garde une résistance très légère.",
         },
