@@ -22,7 +22,6 @@ export type WorkoutFinisher = {
 };
 
 export type DailyWorkout = {
-  day: string;
   session: string;
   circuit_repetitions: number;
   exercises: WorkoutExercise[];
@@ -544,7 +543,6 @@ Dos contre un mur :
 export const WORKOUT_PLAN: WorkoutPlan = {
   weekly_plan: [
     {
-      day: "Monday",
       session: "S1 - Full body équilibre",
       circuit_repetitions: 2,
       exercises: [
@@ -561,7 +559,6 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       },
     },
     {
-      day: "Tuesday",
       session: "S2 - Bas du corps",
       circuit_repetitions: 2,
       exercises: [
@@ -578,7 +575,6 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       },
     },
     {
-      day: "Wednesday",
       session: "S3 - Haut du corps",
       circuit_repetitions: 2,
       exercises: [
@@ -599,7 +595,6 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       },
     },
     {
-      day: "Friday",
       session: "S4 - Core & contrôle",
       circuit_repetitions: 2,
       exercises: [
@@ -616,7 +611,6 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       },
     },
     {
-      day: "Saturday",
       session: "S5 - Unilatéral",
       circuit_repetitions: 2,
       exercises: [
@@ -634,7 +628,6 @@ export const WORKOUT_PLAN: WorkoutPlan = {
       },
     },
     {
-      day: "Sunday",
       session: "S6 - Full body intense",
       circuit_repetitions: 3,
       exercises: [
@@ -657,7 +650,6 @@ export const WORKOUT_PLAN: WorkoutPlan = {
 export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
   weekly_plan: [
     {
-      day: "Monday",
       session: "S1 - Full body équilibre",
       circuit_repetitions: 2,
       exercises: [
@@ -678,7 +670,6 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Tuesday",
       session: "S2 - Bas du corps",
       circuit_repetitions: 2,
       exercises: [
@@ -699,7 +690,6 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Wednesday",
       session: "S3 - Haut du corps",
       circuit_repetitions: 2,
       exercises: [
@@ -728,7 +718,6 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Friday",
       session: "S4 - Core & contrôle",
       circuit_repetitions: 2,
       exercises: [
@@ -745,7 +734,6 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Saturday",
       session: "S5 - Unilatéral",
       circuit_repetitions: 2,
       exercises: [
@@ -763,7 +751,6 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Sunday",
       session: "S6 - Full body intense",
       circuit_repetitions: 3,
       exercises: [
@@ -786,7 +773,6 @@ export const WORKOUT_PLAN_ENTRAINE: WorkoutPlan = {
 export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
   weekly_plan: [
     {
-      day: "Monday",
       session: "S1 - Full body équilibre",
       circuit_repetitions: 2,
       exercises: [
@@ -811,7 +797,6 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Tuesday",
       session: "S2 - Bas du corps",
       circuit_repetitions: 2,
       exercises: [
@@ -832,7 +817,6 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Wednesday",
       session: "S3 - Haut du corps",
       circuit_repetitions: 2,
       exercises: [
@@ -862,7 +846,6 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Friday",
       session: "S4 - Core & contrôle",
       circuit_repetitions: 2,
       exercises: [
@@ -879,7 +862,6 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Saturday",
       session: "S5 - Unilatéral",
       circuit_repetitions: 2,
       exercises: [
@@ -904,7 +886,6 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
       },
     },
     {
-      day: "Sunday",
       session: "S6 - Full body intense",
       circuit_repetitions: 3,
       exercises: [
@@ -930,7 +911,6 @@ export const WORKOUT_PLAN_BIEN_ENTRAINE: WorkoutPlan = {
 export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
   weekly_plan: [
     {
-      day: "Monday",
       session: "S1 - Full body équilibre",
       circuit_repetitions: 2,
       exercises: [
@@ -951,7 +931,6 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       },
     },
     {
-      day: "Tuesday",
       session: "S2 - Bas du corps",
       circuit_repetitions: 2,
       exercises: [
@@ -979,7 +958,6 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       },
     },
     {
-      day: "Wednesday",
       session: "S3 - Haut du corps",
       circuit_repetitions: 2,
       exercises: [
@@ -1005,7 +983,6 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       },
     },
     {
-      day: "Friday",
       session: "S4 - Core & contrôle",
       circuit_repetitions: 2,
       exercises: [
@@ -1022,7 +999,6 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       },
     },
     {
-      day: "Saturday",
       session: "S5 - Unilatéral",
       circuit_repetitions: 2,
       exercises: [
@@ -1047,7 +1023,6 @@ export const WORKOUT_PLAN_SPORTIF_HAUT_NIVEAU: WorkoutPlan = {
       },
     },
     {
-      day: "Sunday",
       session: "S6 - Full body intense",
       circuit_repetitions: 3,
       exercises: [

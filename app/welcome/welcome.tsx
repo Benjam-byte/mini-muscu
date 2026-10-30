@@ -21,13 +21,23 @@ import {
   type WorkoutHistoryItem,
   type WorkoutLevel,
 } from "../workoutHistory";
+import {
+  REST_DAY_SCHEDULE_KEY,
+  getNextRestDaySchedule,
+  getPlannedWorkoutForDay,
+  getRestDayForDate,
+  getSavedRestDaySchedule,
+  type RestDayScheduleEntry,
+} from "../restDay";
 import { StreakCard, type StreakRunSummary } from "./streakCard";
 import { MonthStatsCard, type MonthStats } from "./monthStratsCard";
 import { WorkoutPlanPicker } from "./workoutPlanPicker";
+import { RestDayPicker } from "./restDayPicker";
+import { BottomNavigation } from "./bottomNavigation";
 import { ExercisePreviewButton, EyeIcon } from "./eyeIcon";
 import { ExerciseIllustrationModal } from "./exerciceModal";
 
-type Screen = "home" | "workout" | "complete" | "history";
+type Screen = "home" | "workout" | "complete" | "history" | "settings";
 
 const REST_DURATION = 30;
 const WORKOUT_DAY_START_HOUR = 6;
@@ -225,6 +235,9 @@ export default function Welcome() {
 
   const [streakProtectionState, setStreakProtectionState] =
     useState<StreakProtectionState>(getSavedStreakProtectionState);
+  const [restDaySchedule, setRestDaySchedule] = useState<
+    RestDayScheduleEntry[]
+  >(getSavedRestDaySchedule);
 
   const openExerciseIllustration = (exerciseName: string) => {
     setViewedExerciseHelpNameSet((currentExerciseNameSet) => {
@@ -296,12 +309,20 @@ export default function Welcome() {
     return `workout_done_${formatWorkoutDateKey(date)}`;
   }
 
-  function hasWorkoutPlanned(date: Date) {
-    const dayName = dayNames[date.getDay()];
+  function getRestDay(date: Date) {
+    return getRestDayForDate(restDaySchedule, formatWorkoutDateKey(date));
+  }
 
-    return selectedWorkoutPlan.weekly_plan.some(
-      (workout) => workout.day === dayName,
+  function getPlannedWorkout(date: Date) {
+    return getPlannedWorkoutForDay(
+      selectedWorkoutPlan.weekly_plan,
+      date.getDay(),
+      getRestDay(date),
     );
+  }
+
+  function hasWorkoutPlanned(date: Date) {
+    return getPlannedWorkout(date) !== null;
   }
 
   function getDateFromWorkoutDoneKey(dateKey: string) {
@@ -535,21 +556,23 @@ export default function Welcome() {
   const today = new Date();
   const workoutDayDate = getWorkoutDayDate(today);
   const todayKey = `workout_done_${formatWorkoutDateKey(workoutDayDate)}`;
-  const dayNames = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-  ];
-  const todayName = dayNames[workoutDayDate.getDay()];
+  const todayRestDay = getRestDay(workoutDayDate);
+  const todayWorkout = getPlannedWorkout(workoutDayDate);
+  const isRestDay = !todayWorkout;
 
-  const todayWorkout = selectedWorkoutPlan.weekly_plan.find(
-    (workout) => workout.day === todayName,
-  );
-  const isRestDay = todayName === "Thursday";
+  const handleRestDayChange = (restDay: number) => {
+    const nextRestDaySchedule = getNextRestDaySchedule(
+      restDaySchedule,
+      restDay,
+      formatWorkoutDateKey(workoutDayDate),
+    );
+
+    localStorage.setItem(
+      REST_DAY_SCHEDULE_KEY,
+      JSON.stringify(nextRestDaySchedule),
+    );
+    setRestDaySchedule(nextRestDaySchedule);
+  };
 
   const getCurrentFinisherResult = (): FinisherResult | null => {
     if (!todayWorkout) {
@@ -935,8 +958,7 @@ export default function Welcome() {
     const isDone = isWorkoutCompleted(dateKey);
     const isProtectedByJoker = isWorkoutProtectedByJoker(dateKey);
 
-    const dayName = dayNames[date.getDay()];
-    const isRestDay = dayName === "Thursday";
+    const isRestDay = !hasWorkoutPlanned(date);
     const currentWorkoutDay = new Date(
       workoutDayDate.getFullYear(),
       workoutDayDate.getMonth(),
@@ -960,10 +982,7 @@ export default function Welcome() {
   };
 
   const restoreMissedWorkout = (date: Date) => {
-    const dayName = dayNames[date.getDay()];
-    const plannedWorkout = selectedWorkoutPlan.weekly_plan.find(
-      (workout) => workout.day === dayName,
-    );
+    const plannedWorkout = getPlannedWorkout(date);
     if (!plannedWorkout) return;
 
     const dateKey = getWorkoutDoneKey(date);
@@ -1284,19 +1303,7 @@ export default function Welcome() {
           </div>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3">
-          <div className="max-w-md mx-auto flex gap-2">
-            <button
-              onClick={() => setScreen("home")}
-              className="flex-1 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              Aujourd'hui
-            </button>
-            <button className="flex-1 py-3 rounded-xl bg-slate-800 text-white">
-              Historique
-            </button>
-          </div>
-        </div>
+        <BottomNavigation screen="history" onScreenChange={setScreen} />
 
         {isJokerModalOpen && (
           <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 p-4 sm:items-center">
@@ -1584,7 +1591,7 @@ export default function Welcome() {
                 Profitez de votre journée de récupération
               </p>
             </div>
-          ) : todayWorkout ? (
+          ) : (
             <div className="space-y-6">
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <div className="flex items-start justify-between mb-4">
@@ -1649,10 +1656,6 @@ export default function Welcome() {
                 )}
               </div>
             </div>
-          ) : (
-            <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
-              <p className="text-slate-500">Aucune séance prévue aujourd'hui</p>
-            </div>
           )}
           <div className="mt-6">
             <WorkoutPlanPicker
@@ -1662,23 +1665,29 @@ export default function Welcome() {
           </div>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3">
-          <div className="max-w-md mx-auto flex gap-2">
-            <button className="flex-1 py-3 rounded-xl bg-slate-800 text-white">
-              Aujourd'hui
-            </button>
-            <button
-              onClick={() => setScreen("history")}
-              className="flex-1 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              Historique
-            </button>
-          </div>
-        </div>
+        <BottomNavigation screen="home" onScreenChange={setScreen} />
         <ExerciseIllustrationModal
           exerciseName={selectedExerciseName}
           onClose={closeExerciseIllustration}
         />
+      </div>
+    );
+  }
+
+  if (screen === "settings") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
+        <div className="max-w-md mx-auto pt-2">
+          <h1 className="mb-6 text-3xl text-slate-800">Réglages</h1>
+
+          <RestDayPicker
+            selectedRestDay={todayRestDay}
+            weeklyPlan={selectedWorkoutPlan.weekly_plan}
+            onRestDayChange={handleRestDayChange}
+          />
+        </div>
+
+        <BottomNavigation screen="settings" onScreenChange={setScreen} />
       </div>
     );
   }
