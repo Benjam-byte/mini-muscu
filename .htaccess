@@ -1,3 +1,9 @@
+<IfModule mod_headers.c>
+  <Files "sw.js">
+    Header set Cache-Control "no-cache"
+  </Files>
+</IfModule>
+
 RewriteEngine On
 RewriteBase /mini-muscu/
 

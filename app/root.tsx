@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -39,7 +40,7 @@ export const links: Route.LinksFunction = () => [
 ];
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -57,6 +58,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      import("./devForestDemo").then(({ applyDemoForest }) =>
+        applyDemoForest(),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.PROD || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    navigator.serviceWorker
+      .register("/mini-muscu/sw.js", { scope: "/mini-muscu/" })
+      .catch((error) => {
+        console.error("Unable to register service worker", error);
+      });
+  }, []);
+
   return <Outlet />;
 }
 

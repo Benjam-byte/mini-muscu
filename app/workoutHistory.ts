@@ -56,6 +56,9 @@ export const WORKOUT_LEVEL_EMOJI_BY_LEVEL: Record<WorkoutLevel, string> = {
   sportif_haut_niveau: "⚡",
 };
 
+export const formatWorkoutDateKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
 export const getCurrentWorkoutLevel = (): WorkoutLevel => {
   const storedWorkoutLevel = localStorage.getItem(CURRENT_WORKOUT_LEVEL_KEY);
 
@@ -98,6 +101,23 @@ export const isWorkoutCompleted = (dateKey: string): boolean => {
   const workoutHistoryItem = getWorkoutHistoryItem(dateKey);
 
   return workoutHistoryItem?.isCompleted === true;
+};
+
+export const getCompletedWorkoutDateKeySet = (): Set<string> => {
+  const completedWorkoutDateKeySet = new Set<string>();
+
+  for (let index = 0; index < localStorage.length; index++) {
+    const storageKey = localStorage.key(index);
+
+    if (
+      storageKey?.startsWith("workout_done_") &&
+      isWorkoutCompleted(storageKey)
+    ) {
+      completedWorkoutDateKeySet.add(storageKey);
+    }
+  }
+
+  return completedWorkoutDateKeySet;
 };
 
 export const getCompletedWorkoutHistoryItemList =

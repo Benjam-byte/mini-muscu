@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   WORKOUT_PLAN,
   WORKOUT_PLAN_BIEN_ENTRAINE,
@@ -11,6 +11,8 @@ import {
   LEVEL_UP_SUGGESTION_DISMISSED_AT_KEY,
   WORKOUT_LEVEL_EMOJI_BY_LEVEL,
   WORKOUT_LEVEL_LIST,
+  formatWorkoutDateKey,
+  getCompletedWorkoutDateKeySet,
   getCurrentWorkoutLevel,
   getLatestFinisherResult,
   getWorkoutHistoryItem,
@@ -22,6 +24,21 @@ import {
   type WorkoutLevel,
 } from "../workoutHistory";
 import {
+  GROWTH_STAGE_LIST,
+  analyzeHistory,
+  formatGrowthMultiplier,
+  getDateFromWorkoutDoneKey,
+  getForest,
+  getForestSceneData,
+  getGrowthMultiplier,
+  getLastSeenForestMonthKey,
+  getMonthGrowth,
+  saveLastSeenForestMonthKey,
+  type HistoryAnalysis,
+  type MonthGrowth,
+  type StreakRunSummary,
+} from "../forest";
+import {
   REST_DAY_SCHEDULE_KEY,
   getNextRestDaySchedule,
   getPlannedWorkoutForDay,
@@ -29,7 +46,8 @@ import {
   getSavedRestDaySchedule,
   type RestDayScheduleEntry,
 } from "../restDay";
-import { StreakCard, type StreakRunSummary } from "./streakCard";
+import { MonthPlantCard, getPlantEmoji } from "./monthPlantCard";
+import { ForestView } from "./forestView";
 import { MonthStatsCard, type MonthStats } from "./monthStratsCard";
 import { WorkoutPlanPicker } from "./workoutPlanPicker";
 import { RestDayPicker } from "./restDayPicker";
@@ -46,7 +64,7 @@ const VIEWED_EXERCISE_HELP_NAME_LIST_KEY =
   "viewed_exercise_help_name_list";
 const LEVEL_UP_SUGGESTION_DISMISSAL_DURATION = 7 * 24 * 60 * 60 * 1000;
 const STREAK_PROTECTION_KEY = "streak_protection";
-const MAX_STREAK_JOKER_COUNT = 4;
+const MAX_STREAK_JOKER_COUNT = 2;
 const STREAK_JOKER_REGENERATION_DURATION = 7 * 24 * 60 * 60 * 1000;
 const MISSED_DAY_RESTORE_TAP_COUNT = 4;
 const MISSED_DAY_RESTORE_TAP_DELAY = 900; // ms
@@ -145,6 +163,7 @@ type StreakAnalysis = {
   streak: number;
   protectionState: StreakProtectionState;
   bestStreakRunList: StreakRunSummary[];
+  historyAnalysis: HistoryAnalysis;
 };
 
 export default function Welcome() {
@@ -186,6 +205,11 @@ export default function Welcome() {
   const [selectedJokerDateKey, setSelectedJokerDateKey] = useState<
     string | null
   >(null);
+  // Incrémenté à chaque séance enregistrée : relance les calculs mémoïsés
+  // sur l'historique, qui ne parcourent plus localStorage à chaque rendu.
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [plantedMonthGrowth, setPlantedMonthGrowth] =
+    useState<MonthGrowth | null>(null);
 
   function getSavedStreakProtectionState(): StreakProtectionState {
     const savedStreakProtectionState = localStorage.getItem(
@@ -301,10 +325,6 @@ export default function Welcome() {
 
   const selectedWorkoutPlan = WORKOUT_PLAN_BY_LEVEL[currentWorkoutLevel];
 
-  function formatWorkoutDateKey(date: Date) {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  }
-
   function getWorkoutDoneKey(date: Date) {
     return `workout_done_${formatWorkoutDateKey(date)}`;
   }
@@ -323,37 +343,6 @@ export default function Welcome() {
 
   function hasWorkoutPlanned(date: Date) {
     return getPlannedWorkout(date) !== null;
-  }
-
-  function getDateFromWorkoutDoneKey(dateKey: string) {
-    const datePart = dateKey.replace("workout_done_", "");
-    const [year, month, day] = datePart.split("-").map(Number);
-
-    if (!year || !month || !day) {
-      return null;
-    }
-
-    return new Date(year, month - 1, day);
-  }
-
-  function getCompletedOrProtectedDateKeyList(
-    protectionState: StreakProtectionState,
-  ) {
-    const dateKeySet = new Set<string>(protectionState.protectedDateKeyList);
-
-    for (let index = 0; index < localStorage.length; index++) {
-      const storageKey = localStorage.key(index);
-
-      if (!storageKey || !storageKey.startsWith("workout_done_")) {
-        continue;
-      }
-
-      if (isWorkoutCompleted(storageKey)) {
-        dateKeySet.add(storageKey);
-      }
-    }
-
-    return [...dateKeySet].sort();
   }
 
   function regenerateStreakJokers(
@@ -390,152 +379,36 @@ export default function Welcome() {
     };
   }
 
-  function getBestStreakRunList(
-    protectionState: StreakProtectionState,
-    workoutDayDate: Date,
-  ): StreakRunSummary[] {
-    const protectedDateKeySet = new Set(protectionState.protectedDateKeyList);
-    const completedOrProtectedDateKeyList =
-      getCompletedOrProtectedDateKeyList(protectionState);
-    const firstDateKey = completedOrProtectedDateKeyList[0];
-    const firstDate = firstDateKey
-      ? getDateFromWorkoutDoneKey(firstDateKey)
-      : null;
-
-    if (!firstDate) {
-      return [];
-    }
-
-    const currentWorkoutDay = new Date(
-      workoutDayDate.getFullYear(),
-      workoutDayDate.getMonth(),
-      workoutDayDate.getDate(),
-    );
-    const todayDateKey = getWorkoutDoneKey(currentWorkoutDay);
-    const shouldSkipToday = !isWorkoutCompleted(todayDateKey);
-    const streakRunList: StreakRunSummary[] = [];
-    let currentRunDateKeyList: string[] = [];
-    let currentRunJokerDateKeyList: string[] = [];
-
-    const pushCurrentRun = () => {
-      if (currentRunDateKeyList.length === 0) {
-        return;
-      }
-
-      streakRunList.push({
-        length: currentRunDateKeyList.length,
-        startDateKey: currentRunDateKeyList[0],
-        endDateKey: currentRunDateKeyList[currentRunDateKeyList.length - 1],
-        jokerDateKeyList: currentRunJokerDateKeyList,
-      });
-
-      currentRunDateKeyList = [];
-      currentRunJokerDateKeyList = [];
-    };
-
-    for (
-      let date = new Date(
-        firstDate.getFullYear(),
-        firstDate.getMonth(),
-        firstDate.getDate(),
-      );
-      date <= currentWorkoutDay;
-      date.setDate(date.getDate() + 1)
-    ) {
-      if (!hasWorkoutPlanned(date)) {
-        continue;
-      }
-
-      const dateKey = getWorkoutDoneKey(date);
-
-      if (shouldSkipToday && dateKey === todayDateKey) {
-        continue;
-      }
-
-      if (
-        isWorkoutCompleted(dateKey) ||
-        protectedDateKeySet.has(dateKey)
-      ) {
-        currentRunDateKeyList.push(dateKey);
-
-        if (protectedDateKeySet.has(dateKey)) {
-          currentRunJokerDateKeyList.push(dateKey);
-        }
-
-        continue;
-      }
-
-      pushCurrentRun();
-    }
-
-    pushCurrentRun();
-
-    return streakRunList
-      .sort((firstRun, secondRun) => {
-        if (firstRun.length !== secondRun.length) {
-          return secondRun.length - firstRun.length;
-        }
-
-        return secondRun.endDateKey.localeCompare(firstRun.endDateKey);
-      })
-      .slice(0, 5);
-  }
-
   function getStreakAnalysis(
     workoutDayDate: Date,
     currentProtectionState: StreakProtectionState,
+    completedWorkoutDateKeySet: Set<string>,
   ): StreakAnalysis {
     let protectionState = regenerateStreakJokers(
       currentProtectionState,
       workoutDayDate,
     );
-    const protectedDateKeySet = new Set(protectionState.protectedDateKeyList);
-    let streak = 0;
-    const dateToCheck = new Date(workoutDayDate);
-
-    const isTodayCompleted = isWorkoutCompleted(getWorkoutDoneKey(dateToCheck));
-
-    if (!isTodayCompleted) {
-      dateToCheck.setDate(dateToCheck.getDate() - 1);
-    }
-
-    for (let checkedDayCount = 0; checkedDayCount < 366; checkedDayCount++) {
-      if (!hasWorkoutPlanned(dateToCheck)) {
-        dateToCheck.setDate(dateToCheck.getDate() - 1);
-        continue;
-      }
-
-      const dateKey = getWorkoutDoneKey(dateToCheck);
-      const isWorkoutDone = isWorkoutCompleted(dateKey);
-      const isWorkoutProtected = protectedDateKeySet.has(dateKey);
-
-      if (isWorkoutDone || isWorkoutProtected) {
-        streak += 1;
-        dateToCheck.setDate(dateToCheck.getDate() - 1);
-        continue;
-      }
-
-      break;
-    }
-
-    const bestStreakRunList = getBestStreakRunList(
-      protectionState,
+    const historyAnalysis = analyzeHistory({
+      completedWorkoutDateKeySet,
+      protectedDateKeySet: new Set(protectionState.protectedDateKeyList),
+      restDaySchedule,
       workoutDayDate,
-    );
-    const bestCurrentRunLength = bestStreakRunList[0]?.length ?? 0;
+    });
+    const bestCurrentRunLength = historyAnalysis.streakRunList[0]?.length ?? 0;
     protectionState = {
       ...protectionState,
       bestStreak: Math.max(
         protectionState.bestStreak,
-        streak,
+        historyAnalysis.streak,
         bestCurrentRunLength,
       ),
     };
 
     return {
-      streak,
+      streak: historyAnalysis.streak,
       protectionState,
-      bestStreakRunList,
+      bestStreakRunList: historyAnalysis.streakRunList,
+      historyAnalysis,
     };
   }
 
@@ -612,11 +485,58 @@ export default function Welcome() {
     };
   };
 
-  const streakAnalysis = getStreakAnalysis(
-    workoutDayDate,
-    streakProtectionState,
+  const completedWorkoutDateKeySet = useMemo(
+    () => getCompletedWorkoutDateKeySet(),
+    [historyVersion, todayKey],
+  );
+  const streakAnalysis = useMemo(
+    () =>
+      getStreakAnalysis(
+        workoutDayDate,
+        streakProtectionState,
+        completedWorkoutDateKeySet,
+      ),
+    [completedWorkoutDateKeySet, streakProtectionState, restDaySchedule, todayKey],
   );
   const currentStreak = streakAnalysis.streak;
+  const currentMonthGrowth = useMemo(
+    () =>
+      getMonthGrowth(
+        workoutDayDate,
+        streakAnalysis.historyAnalysis,
+        restDaySchedule,
+      ),
+    [streakAnalysis.historyAnalysis, restDaySchedule],
+  );
+  const forest = useMemo(
+    () => getForest(streakAnalysis.historyAnalysis, restDaySchedule),
+    [streakAnalysis.historyAnalysis, restDaySchedule],
+  );
+  const forestSceneData = useMemo(
+    () => getForestSceneData(forest, currentMonthGrowth, currentStreak),
+    [forest, currentMonthGrowth, currentStreak],
+  );
+
+  // Au premier passage dans un nouveau mois, la plante du mois précédent est
+  // annoncée comme plantée dans la forêt.
+  useEffect(() => {
+    const lastSeenMonthKey = getLastSeenForestMonthKey();
+
+    if (lastSeenMonthKey === currentMonthGrowth.monthKey) {
+      return;
+    }
+
+    saveLastSeenForestMonthKey(currentMonthGrowth.monthKey);
+    const latestPlantedMonthGrowth = forest[forest.length - 1];
+
+    if (
+      lastSeenMonthKey &&
+      latestPlantedMonthGrowth &&
+      latestPlantedMonthGrowth.monthKey >= lastSeenMonthKey
+    ) {
+      setPlantedMonthGrowth(latestPlantedMonthGrowth);
+    }
+  }, [currentMonthGrowth.monthKey, forest]);
 
   const frenchDayNames = [
     "Dimanche",
@@ -904,6 +824,7 @@ export default function Welcome() {
     };
 
     localStorage.setItem(todayKey, JSON.stringify(workoutHistoryItem));
+    setHistoryVersion((currentHistoryVersion) => currentHistoryVersion + 1);
     setIsCompleted(true);
     setScreen("home");
     setSelectedDifficultyRating(null);
@@ -1005,6 +926,7 @@ export default function Welcome() {
     };
 
     localStorage.setItem(dateKey, JSON.stringify(workoutHistoryItem));
+    setHistoryVersion((currentHistoryVersion) => currentHistoryVersion + 1);
     setMissedDayRestoreTapState({ dateKey: "", count: 0, lastTappedAt: 0 });
     if (dateKey === todayKey) setIsCompleted(true);
   };
@@ -1077,11 +999,15 @@ export default function Welcome() {
       ]),
     ].sort();
 
-    return getStreakAnalysis(workoutDayDate, {
-      ...streakAnalysis.protectionState,
-      jokerCount: streakAnalysis.protectionState.jokerCount - 1,
-      protectedDateKeyList,
-    });
+    return getStreakAnalysis(
+      workoutDayDate,
+      {
+        ...streakAnalysis.protectionState,
+        jokerCount: streakAnalysis.protectionState.jokerCount - 1,
+        protectedDateKeyList,
+      },
+      completedWorkoutDateKeySet,
+    );
   };
 
   const applySelectedJoker = () => {
@@ -1339,11 +1265,12 @@ export default function Welcome() {
               <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
                 <p>
                   Un joker protège un entraînement oublié et peut reconnecter
-                  ta streak.
+                  ta série, donc son bonus de croissance.
                 </p>
                 <p className="mt-2 text-xs text-amber-700">
-                  Le jour compte dans la streak, mais reste distinct d’une
-                  séance réellement terminée dans tes statistiques.
+                  Le jour compte dans la série, mais ne fait pas pousser la
+                  plante et reste distinct d’une séance réellement terminée
+                  dans tes statistiques.
                 </p>
               </div>
 
@@ -1461,10 +1388,12 @@ export default function Welcome() {
                   </p>
                   <p className="mt-2 leading-relaxed">
                     {jokerPreviewAnalysis.streak > currentStreak
-                      ? currentStreak === 0
-                        ? `Ce joker redémarrera ta streak à ${jokerPreviewAnalysis.streak} jour${jokerPreviewAnalysis.streak > 1 ? "s" : ""}.`
-                        : `Ta streak passera de ${currentStreak} à ${jokerPreviewAnalysis.streak} jours.`
-                      : "Ce joker ne redémarrera pas ta streak actuelle : un autre jour oublié la sépare encore de tes séances récentes."}
+                      ? `${
+                          currentStreak === 0
+                            ? `Ce joker redémarrera ta série à ${jokerPreviewAnalysis.streak} jour${jokerPreviewAnalysis.streak > 1 ? "s" : ""}`
+                            : `Ta série passera de ${currentStreak} à ${jokerPreviewAnalysis.streak} jours`
+                        }, croissance ${formatGrowthMultiplier(getGrowthMultiplier(jokerPreviewAnalysis.streak))}.`
+                      : "Ce joker ne redémarrera pas ta série actuelle : un autre jour oublié la sépare encore de tes séances récentes."}
                   </p>
                 </div>
               )}
@@ -1495,173 +1424,219 @@ export default function Welcome() {
 
   if (screen === "home") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4 pb-24">
-        <div className="max-w-md mx-auto pt-2">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h1 className="text-3xl text-slate-800">Routine 15min</h1>
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 pb-24">
+        <div className="relative h-[42vh] min-h-64 max-h-[28rem]">
+          <ForestView
+            mode="home"
+            sceneData={forestSceneData}
+            className="absolute inset-0"
+          />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white/75 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-slate-50" />
 
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() =>
-                  setIsJokerPopoverOpen(
-                    (currentIsJokerPopoverOpen) =>
-                      !currentIsJokerPopoverOpen,
-                  )
-                }
-                className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition-colors hover:bg-amber-100"
-                aria-label="Voir les jokers de streak"
-              >
-                <span aria-hidden="true">🃏</span>
-                <span>
-                  {streakAnalysis.protectionState.jokerCount}/
-                  {MAX_STREAK_JOKER_COUNT}
-                </span>
-              </button>
+          <div className="pointer-events-none relative mx-auto max-w-md px-4 pt-6">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <h1 className="text-3xl text-slate-800">Routine 15min</h1>
 
-              {isJokerPopoverOpen && (
-                <div className="absolute right-0 top-10 z-20 w-60 rounded-xl border border-amber-100 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
-                  <p className="text-amber-800">
-                    Un joker protège une séance prévue oubliée.
-                  </p>
-                  <p className="mt-1">
-                    Tu en récupères 1 tous les 7 jours, jusqu'à{" "}
-                    {MAX_STREAK_JOKER_COUNT} en stock.
-                  </p>
-                  <p className="mt-1">
-                    Ils ne sont jamais utilisés automatiquement : active-les
-                    depuis l’historique.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          <p className="text-slate-500 mb-2">
-            {today.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            })}
-          </p>
-          <div className="mb-6">
-            <StreakCard
-              streak={currentStreak}
-              bestStreak={streakAnalysis.protectionState.bestStreak}
-              consumedJokerCount={
-                streakAnalysis.protectionState.protectedDateKeyList.length
-              }
-              bestStreakRunList={streakAnalysis.bestStreakRunList}
-            />
-          </div>
-
-          {shouldShowLevelUpSuggestion &&
-            currentWorkoutLevel !== "sportif_haut_niveau" && (
-            <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-5 shadow-sm">
-              <h2 className="mb-2 text-lg text-green-900">
-                Progression disponible
-              </h2>
-              <p className="mb-4 text-sm text-green-800">
-                Tes 3 dernières séances ont été faciles. Tu peux essayer le
-                niveau supérieur.
-              </p>
-              <div className="flex gap-2">
+              <div className="pointer-events-auto relative shrink-0">
                 <button
                   type="button"
-                  onClick={increaseWorkoutLevel}
-                  className="flex-1 rounded-xl bg-green-700 px-4 py-3 text-sm text-white transition-colors hover:bg-green-800"
+                  onClick={() =>
+                    setIsJokerPopoverOpen(
+                      (currentIsJokerPopoverOpen) =>
+                        !currentIsJokerPopoverOpen,
+                    )
+                  }
+                  className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-sm text-amber-700 transition-colors hover:bg-amber-100"
+                  aria-label="Voir les jokers de streak"
                 >
-                  Monter de niveau
+                  <span aria-hidden="true">🃏</span>
+                  <span>
+                    {streakAnalysis.protectionState.jokerCount}/
+                    {MAX_STREAK_JOKER_COUNT}
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={dismissLevelUpSuggestion}
-                  className="rounded-xl bg-white px-4 py-3 text-sm text-green-800 transition-colors hover:bg-green-100"
-                >
-                  Plus tard
-                </button>
-              </div>
-            </div>
-          )}
 
-          {isRestDay ? (
-            <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
-              <div className="text-6xl mb-4">🧘</div>
-              <h2 className="text-2xl mb-2 text-slate-800">Jour de repos</h2>
-              <p className="text-slate-500">
-                Profitez de votre journée de récupération
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h2 className="text-xl mb-1 text-slate-800">
-                      {todayWorkout.session}
-                    </h2>
-                    <p className="text-sm text-slate-500">
-                      {todayWorkout.circuit_repetitions} circuits
+                {isJokerPopoverOpen && (
+                  <div className="absolute right-0 top-10 z-20 w-60 rounded-xl border border-amber-100 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
+                    <p className="text-amber-800">
+                      Un joker protège une séance prévue oubliée : ta série et
+                      son bonus de croissance continuent.
+                    </p>
+                    <p className="mt-1">
+                      Tu en récupères 1 tous les 7 jours, jusqu'à{" "}
+                      {MAX_STREAK_JOKER_COUNT} en stock.
+                    </p>
+                    <p className="mt-1">
+                      Ils ne sont jamais utilisés automatiquement : active-les
+                      depuis l’historique.
                     </p>
                   </div>
-                  {isCompleted && (
-                    <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-                      ✓ Fait
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2 mb-6">
-                  {todayWorkout.exercises.map((ex, idx) => (
-                    <div
-                      key={idx}
-                      className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0"
-                    >
-                      <div className="flex items-center gap-2">
-                        <ExercisePreviewButton
-                          exerciseName={ex.name}
-                          hasUnseenHelp={!viewedExerciseHelpNameSet.has(ex.name)}
-                          onClick={openExerciseIllustration}
-                        />
-                        <span className="text-slate-700">{ex.name}</span>
-                      </div>
-                      <span className="text-slate-500 text-sm">
-                        {ex.reps || ex.time || ex.instruction}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between items-center py-2 bg-slate-50 rounded-lg px-3 mt-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-700">
-                        Finisher: {todayWorkout.finisher.name}
-                      </span>
-                    </div>
-                    <span className="text-slate-500 text-sm">
-                      {todayWorkout.finisher.instruction}
-                    </span>
-                  </div>
-                </div>
-
-                {isCompleted ? (
-                  <div className="text-center py-4 text-green-700">
-                    <div className="text-5xl mb-2">🎉</div>
-                    <p className="text-lg">Séance terminée aujourd'hui</p>
-                  </div>
-                ) : (
-                  <button
-                    onClick={startWorkout}
-                    className="w-full bg-slate-800 text-white py-4 rounded-xl text-lg hover:bg-slate-700 transition-colors"
-                  >
-                    Commencer la séance
-                  </button>
                 )}
               </div>
             </div>
-          )}
-          <div className="mt-6">
-            <WorkoutPlanPicker
-              selectedWorkoutLevel={currentWorkoutLevel}
-              onWorkoutLevelChange={handleWorkoutLevelChange}
-            />
+            <p className="text-slate-600">
+              {today.toLocaleDateString("fr-FR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
+            </p>
+          </div>
+        </div>
+
+        <div className="relative -mt-16 px-4">
+          <div className="max-w-md mx-auto">
+            {plantedMonthGrowth && (
+              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-green-200 bg-green-50 p-4 shadow-sm">
+                <span className="text-4xl">
+                  {getPlantEmoji(plantedMonthGrowth)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-green-900">
+                    Ton {plantedMonthGrowth.plantName.charAt(0).toLowerCase()}
+                    {plantedMonthGrowth.plantName.slice(1)} a rejoint ta forêt
+                    🌳
+                  </p>
+                  <p className="mt-0.5 text-xs text-green-700">
+                    {GROWTH_STAGE_LIST[plantedMonthGrowth.stageIndex].title} ·{" "}
+                    {plantedMonthGrowth.completedCount} séance
+                    {plantedMonthGrowth.completedCount > 1 ? "s" : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPlantedMonthGrowth(null)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-green-800 transition-colors hover:bg-white"
+                  aria-label="Fermer"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <MonthPlantCard
+                monthGrowth={currentMonthGrowth}
+                streak={currentStreak}
+                bestStreak={streakAnalysis.protectionState.bestStreak}
+                consumedJokerCount={
+                  streakAnalysis.protectionState.protectedDateKeyList.length
+                }
+                bestStreakRunList={streakAnalysis.bestStreakRunList}
+                forest={forest}
+              />
+            </div>
+
+            {shouldShowLevelUpSuggestion &&
+              currentWorkoutLevel !== "sportif_haut_niveau" && (
+              <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-5 shadow-sm">
+                <h2 className="mb-2 text-lg text-green-900">
+                  Progression disponible
+                </h2>
+                <p className="mb-4 text-sm text-green-800">
+                  Tes 3 dernières séances ont été faciles. Tu peux essayer le
+                  niveau supérieur.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={increaseWorkoutLevel}
+                    className="flex-1 rounded-xl bg-green-700 px-4 py-3 text-sm text-white transition-colors hover:bg-green-800"
+                  >
+                    Monter de niveau
+                  </button>
+                  <button
+                    type="button"
+                    onClick={dismissLevelUpSuggestion}
+                    className="rounded-xl bg-white px-4 py-3 text-sm text-green-800 transition-colors hover:bg-green-100"
+                  >
+                    Plus tard
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isRestDay ? (
+              <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
+                <div className="text-6xl mb-4">🧘</div>
+                <h2 className="text-2xl mb-2 text-slate-800">Jour de repos</h2>
+                <p className="text-slate-500">
+                  Profitez de votre journée de récupération
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h2 className="text-xl mb-1 text-slate-800">
+                        {todayWorkout.session}
+                      </h2>
+                      <p className="text-sm text-slate-500">
+                        {todayWorkout.circuit_repetitions} circuits
+                      </p>
+                    </div>
+                    {isCompleted && (
+                      <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+                        ✓ Fait
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 mb-6">
+                    {todayWorkout.exercises.map((ex, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ExercisePreviewButton
+                            exerciseName={ex.name}
+                            hasUnseenHelp={!viewedExerciseHelpNameSet.has(ex.name)}
+                            onClick={openExerciseIllustration}
+                          />
+                          <span className="text-slate-700">{ex.name}</span>
+                        </div>
+                        <span className="text-slate-500 text-sm">
+                          {ex.reps || ex.time || ex.instruction}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center py-2 bg-slate-50 rounded-lg px-3 mt-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-700">
+                          Finisher: {todayWorkout.finisher.name}
+                        </span>
+                      </div>
+                      <span className="text-slate-500 text-sm">
+                        {todayWorkout.finisher.instruction}
+                      </span>
+                    </div>
+                  </div>
+
+                  {isCompleted ? (
+                    <div className="text-center py-4 text-green-700">
+                      <div className="text-5xl mb-2">🎉</div>
+                      <p className="text-lg">Séance terminée aujourd'hui</p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={startWorkout}
+                      className="w-full bg-slate-800 text-white py-4 rounded-xl text-lg hover:bg-slate-700 transition-colors"
+                    >
+                      Commencer la séance
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="mt-6">
+              <WorkoutPlanPicker
+                selectedWorkoutLevel={currentWorkoutLevel}
+                onWorkoutLevelChange={handleWorkoutLevelChange}
+              />
+            </div>
           </div>
         </div>
 
@@ -1693,9 +1668,22 @@ export default function Welcome() {
   }
 
   if (screen === "workout" && todayWorkout) {
+    // La caméra change d'angle à chaque exercice, puis la scène reste figée.
+    const workoutCameraStep = isFinisher
+      ? todayWorkout.circuit_repetitions * todayWorkout.exercises.length
+      : (currentCircuit - 1) * todayWorkout.exercises.length +
+        currentExerciseIndex;
+
     if (isResting) {
       return (
-        <div className="min-h-screen bg-gradient-to-b from-blue-900 to-blue-950 p-4 flex flex-col">
+        <div className="relative isolate min-h-screen p-4 flex flex-col">
+          <ForestView
+            mode="workout"
+            sceneData={forestSceneData}
+            cameraStep={workoutCameraStep}
+            className="fixed inset-0 -z-10"
+          />
+          <div className="fixed inset-0 -z-10 bg-blue-950/45" />
           <div className="max-w-md mx-auto w-full flex-1 flex flex-col pt-8">
             <div className="text-center mb-8">
               <p className="text-blue-300 text-sm mb-2">Repos entre circuits</p>
@@ -1705,7 +1693,7 @@ export default function Welcome() {
             </div>
 
             <div className="flex-1 flex flex-col justify-center">
-              <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 mb-8 text-center">
+              <div className="bg-blue-950/60 rounded-3xl p-8 mb-8 text-center">
                 <h2 className="text-2xl text-white mb-8">Repos</h2>
                 <div className="text-8xl text-white mb-8">{timerSeconds}s</div>
                 <p className="text-blue-200 text-sm">
@@ -1744,7 +1732,14 @@ export default function Welcome() {
 
     return (
       <>
-        <div className="min-h-screen bg-gradient-to-b from-slate-800 to-slate-900 p-4 flex flex-col">
+        <div className="relative isolate min-h-screen p-4 flex flex-col">
+          <ForestView
+            mode="workout"
+            sceneData={forestSceneData}
+            cameraStep={workoutCameraStep}
+            className="fixed inset-0 -z-10"
+          />
+          <div className="fixed inset-0 -z-10 bg-slate-950/30" />
           <div className="max-w-md mx-auto w-full flex-1 flex flex-col pt-8">
             <div className="text-center mb-8">
               <p className="text-slate-400 text-sm mb-2">
@@ -1761,7 +1756,7 @@ export default function Welcome() {
             </div>
 
             <div className="flex-1 flex flex-col justify-center">
-              <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 mb-8">
+              <div className="bg-slate-900/70 rounded-3xl p-8 mb-8">
                 <div className="mb-6 flex items-center justify-center gap-3">
                   <h2 className="text-3xl text-white text-center">
                     {currentExercise.name}

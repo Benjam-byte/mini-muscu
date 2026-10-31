@@ -76,6 +76,14 @@ export const getRestDayForDate = (
   return restDay;
 };
 
+// Tous les niveaux ont 6 séances : un jour est prévu dès qu'il n'est pas le
+// jour de repos en vigueur à sa date.
+export const isPlannedWorkoutDay = (
+  restDaySchedule: RestDayScheduleEntry[],
+  date: Date,
+  dateKey: string,
+): boolean => date.getDay() !== getRestDayForDate(restDaySchedule, dateKey);
+
 export const getNextRestDaySchedule = (
   restDaySchedule: RestDayScheduleEntry[],
   restDay: number,

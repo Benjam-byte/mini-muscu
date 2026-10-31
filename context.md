@@ -63,22 +63,29 @@ Les jours et les thèmes restent identiques entre les niveaux, mais les variante
 - La séance du jour non encore réalisée n'est pas comptée comme un échec.
 - Une séance oubliée peut être restaurée manuellement par 4 appuis rapides sur sa date ; elle est alors enregistrée avec une difficulté neutre de 3 et sans résultat de finisher.
 
-### Streaks et jokers
+### Plante du mois, série et forêt
 
-- La streak compte uniquement les jours où une séance est prévue ; les jours de repos ne la cassent pas.
-- Affichage de la streak actuelle, du record et des 5 meilleures séries.
-- Plusieurs paliers visuels existent, de « Graine » à « Démon de la routine ».
-- Un joker protège un jour d'entraînement oublié et peut reconnecter une streak.
-- Les jokers sont appliqués manuellement depuis l'historique, jamais automatiquement.
-- Un aperçu indique l'effet du joker avant validation.
-- Régénération : 1 joker tous les 7 jours, avec un maximum de 4.
-- Un jour protégé compte dans la streak, mais pas comme séance réellement effectuée dans les statistiques mensuelles.
+- Chaque mois a sa plante, dont l'espèce dépend du mois (sapin enneigé en janvier, cerisier en avril, palmier en juillet, érable en octobre…). Chaque séance terminée la fait pousser et elle ne régresse jamais : un oubli ralentit seulement sa croissance.
+- La série (streak) compte uniquement les jours où une séance est prévue ; les jours de repos ne la cassent pas, la séance du jour non encore faite non plus. Elle continue d'un mois à l'autre.
+- La série est un multiplicateur de croissance : chaque séance rapporte ×1 point, ×1,5 dès 3 jours de suite et ×2 dès 7 jours. Un oubli remet le multiplicateur à ×1 sans toucher à la plante.
+- La plante reste une graine pendant les 3 premières séances du mois (`SEED_SESSION_COUNT`) et germe à la 4e. Ensuite, le palier dépend des points rapportés au nombre de séances prévues dans le mois (futur compris ; pour le mois de la toute première séance, à partir de celle-ci) : Pousse, Petit arbre (25 %), Jeune arbre (50 %), Arbre (90 %), Grand arbre (130 %), Majestueux (170 %, accessible seulement avec une vraie série). Au plus un palier par séance après la graine, pour que chaque phase soit visible même avec un gros bonus de série.
+- Sur l'accueil, la caméra s'approche en plongée tant que la plante du mois est petite (graine, pousse), puis recule à mesure qu'elle grandit pour montrer la forêt.
+- En séance, la caméra cadre toute l'île dans la largeur, quelle que soit la taille de la forêt, et l'image est décalée vers le haut pour que l'île reste au-dessus de la carte d'exercice. En portrait, le champ de vision vertical est élargi pour garder au moins 40° à l'horizontale.
+- En 3D, chaque phase a sa forme et sa plage de taille : graine propre à l'espèce (gland, noix de coco, pomme de pin, samare, noyau), pousse (cotylédons, aiguilles, brins de palme ou petit cactus), petit arbre au tronc fin, puis l'arbre de l'espèce qui grandit et s'étoffe (branches, feuillage, puis fruits, fleurs ou décorations aux deux derniers paliers). Chaque espèce a son propre modèle et chaque arbre une variante tirée de son mois (le cactus alterne même entre candélabre et figuier de Barbarie).
+- À la fin du mois, la plante est plantée dans une île 3D low-poly, au stade atteint (une graine pour un mois à 1-3 séances). Un mois sans aucune séance ne plante rien. La forêt est entièrement recalculée depuis l'historique : rien n'est stocké en plus, et les séances restaurées comptent aussi.
+- L'île sert de hero sur l'accueil (orbite lente, rotation au doigt) et de fond pendant la séance et le repos (ambiance crépuscule, la caméra change d'angle à chaque exercice). Des lucioles autour de la plante signalent une série active.
+- Au premier passage dans un nouveau mois, l'accueil annonce la plante qui vient de rejoindre la forêt.
+- La modale « Ma forêt » affiche les règles, la série actuelle et le record, les jokers consommés, les mois plantés et les 5 meilleures séries.
+- Un joker protège un jour d'entraînement oublié : il prolonge la série (donc le multiplicateur) mais ne fait pas pousser la plante, et ne compte pas comme séance effectuée dans les statistiques mensuelles. Poser un joker sur un jour passé peut reconnecter la série et augmenter rétroactivement les points des jours suivants.
+- Les jokers sont appliqués manuellement depuis l'historique, jamais automatiquement. Un aperçu indique la nouvelle série et le multiplicateur avant validation.
+- Régénération : 1 joker tous les 7 jours, avec un maximum de 2.
 
 ### PWA et rappels
 
 - Manifest, favicons et mode `standalone` présents pour l'installation sur l'écran d'accueil.
+- Un service worker (`public/sw.js`, enregistré en production uniquement) rend l'app utilisable hors ligne : navigation réseau d'abord avec repli sur la page en cache, fichiers hachés de Vite (dont le chunk three.js) en cache d'abord, illustrations et polices en stale-while-revalidate. Changer `CACHE_VERSION` invalide tous les caches.
 - Un mécanisme de notification à 18 h existe si `reminder_enabled` vaut `true` et que la permission navigateur est accordée.
-- Limite actuelle : aucun contrôle visible ne permet d'activer ce rappel. Il ne fonctionne que lorsque la page reste ouverte, car aucun service worker de notification n'est présent.
+- Limite actuelle : aucun contrôle visible ne permet d'activer ce rappel. Il ne fonctionne que lorsque la page reste ouverte, car le service worker ne gère pas les notifications push.
 
 ## Données et persistance
 
@@ -88,7 +95,8 @@ Il n'existe ni API, ni base de données, ni authentification. Les principales cl
 - `workout_done_YYYY-MM-DD` : objet d'historique d'une séance terminée ;
 - `level_up_suggestion_dismissed_at` : date du dernier report de suggestion de niveau ;
 - `viewed_exercise_help_name_list` : exercices dont l'aide a déjà été vue ;
-- `streak_protection` : stock de jokers, dates protégées et record de streak ;
+- `streak_protection` : stock de jokers (2 au maximum), dates protégées et record de série ;
+- `forest_last_seen_month` : dernier mois (`YYYY-MM`) vu sur l'accueil, pour annoncer une seule fois la plante plantée en début de mois ;
 - `reminder_enabled` : état du rappel, bien qu'il n'y ait pas encore d'interface visible pour le modifier ;
 - `rest_day_schedule` : historique des jours de repos choisis, sous la forme `[{ startDateKey: "YYYY-MM-DD", restDay }]`, où `restDay` suit `Date.getDay()` (0 = dimanche). Sans entrée, le repos est le jeudi (4) ;
 - `selected_workout_plan` : ancienne clé uniquement utilisée pour migrer les anciens niveaux, notamment `debutant` vers `base`.
@@ -103,6 +111,7 @@ Conséquence importante : vider les données du navigateur, changer de navigateu
 - React Router 7 en mode SPA (`ssr: false`).
 - Vite 8.
 - Tailwind CSS 4.
+- three.js pour la forêt 3D, utilisé sans react-three-fiber et chargé à part avec `import()` pour ne pas retarder le premier affichage.
 - Dépendances npm minimales, sans bibliothèque d'état globale ni bibliothèque de composants.
 - Base URL et `basename` : `/mini-muscu`.
 - Dockerfile multi-stage avec Node 20 Alpine.
@@ -121,7 +130,15 @@ npm run start
 ## Organisation des fichiers
 
 - `app/routes/home.tsx` : route unique, affiche l'application principale.
-- `app/welcome/welcome.tsx` : composant central ; navigation interne entre accueil, séance, validation, historique et réglages, timers, streaks, jokers, statistiques et persistance.
+- `app/welcome/welcome.tsx` : composant central ; navigation interne entre accueil, séance, validation, historique et réglages, timers, jokers, statistiques et persistance.
+- `app/forest.ts` : logique pure de la série et de la forêt ; un seul parcours chronologique de l'historique (`analyzeHistory`) donne la série, les meilleures séries et les points de croissance par mois, puis `getMonthGrowth`, `getForest` et les espèces par mois.
+- `app/forest/forestEngine.ts` : moteur three.js, singleton partagé par tous les écrans (un seul contexte WebGL). Rendu à 30 images/s sur l'accueil, image fixe en séance hors transitions, boucle arrêtée sur les autres écrans ou onglet masqué.
+- `app/forest/plantModels.ts` : modèles low-poly procéduraux des plantes (graine, pousse, puis un modèle d'arbre par espèce), déterministes par mois.
+- `app/forest/geometryBuilder.ts` : outils de construction communs (primitives colorées par facette, troncs, feuillages, feuilles, fruits).
+- `app/forest/islandModel.ts` : île flottante et relief du sol.
+- `app/welcome/forestView.tsx` : conteneur React de la scène 3D, avec un dégradé servant de ciel, d'écran de chargement et de repli sans WebGL.
+- `app/welcome/monthPlantCard.tsx` : carte de la plante du mois, de la série et de son multiplicateur, et modale « Ma forêt ».
+- `app/devForestDemo.ts` : outil de test en `npm run dev` uniquement, exclu du build de production. `/mini-muscu/?demo-foret=48` remplace l'historique local par 48 mois de séances variées (forêt bien remplie, avec des graines et des pousses) et laisse le mois en cours vide, donc sa plante est une graine ; `/mini-muscu/?demo-foret=reset` restaure l'historique sauvegardé avant la première démo.
 - `app/workout.ts` : types, programmes des 4 niveaux, catalogue des exercices, images et descriptions.
 - `app/workoutHistory.ts` : types et fonctions de lecture de l'historique, niveaux, difficulté, derniers finishers et suggestion de progression.
 - `app/restDay.ts` : jour de repos (historique des choix, jour en vigueur à une date) et répartition des séances de la semaine autour de ce jour.
@@ -129,11 +146,11 @@ npm run start
 - `app/welcome/restDayPicker.tsx` : choix du jour de repos et aperçu de la semaine, affichés dans l'écran Réglages.
 - `app/welcome/bottomNavigation.tsx` : barre du bas commune (Aujourd'hui, Historique, Réglages).
 - `app/welcome/exerciceModal.tsx` : illustration et explication d'un exercice.
-- `app/welcome/streakCard.tsx` : streak actuelle, paliers et records.
 - `app/welcome/monthStratsCard.tsx` : statistiques mensuelles.
 - `app/app.css` : Tailwind et styles globaux.
 - `public/exercises/` : illustrations des exercices.
-- `public/site.webmanifest` : métadonnées PWA.
+- `public/site-v2.webmanifest` : métadonnées PWA (icônes `*-v2`, aussi précachées par `public/sw.js`).
+- `public/sw.js` : service worker hors ligne.
 
 ## Parcours utilisateur type
 
@@ -152,8 +169,6 @@ npm run start
 - `welcome.tsx` concentre actuellement beaucoup de responsabilités ; une évolution importante peut justifier de séparer logique métier, stockage et écrans.
 - Les minuteurs d'exercices interprètent la première valeur numérique d'un texte comme `40s/jambe` : ils chronomètrent donc 40 secondes au total et ne gèrent pas automatiquement chaque côté.
 - Dans `workout.ts`, les séances n'ont pas de jour fixe : c'est leur ordre dans `weekly_plan` qui compte. Le jour de chaque séance est calculé par `getPlannedWorkoutForDay` dans `restDay.ts`.
-- Le manifest référence ses icônes depuis la racine (`/web-app-manifest-...`) alors que l'application est servie sous `/mini-muscu`; vérifier ce point lors d'un travail sur l'installation PWA.
-- La balise `<html>` est actuellement en `lang="en"` alors que toute l'interface est en français.
 - Les métadonnées de la route utilisent encore le titre et la description par défaut de React Router.
 - Aucun test automatisé n'est présent dans le dépôt à ce jour.
 

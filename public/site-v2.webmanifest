@@ -1,6 +1,7 @@
 {
   "name": "MiniMuscu",
   "short_name": "MMuscu",
+  "lang": "fr",
   "start_url": "/mini-muscu/",
   "scope": "/mini-muscu/",
   "icons": [
